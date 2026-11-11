@@ -1,0 +1,999 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>괴담 스튜디오</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Sans+KR:wght@400;600;700;900&display=swap">
+<style>
+:root{--bg:#0e0f11;--p:#16181b;--p2:#1c1f23;--line:#2b2f35;--ink:#e8e4dc;--dim:#9aa0a8;--acc:#b3261e;--acc2:#d9534a}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 "Noto Sans KR",system-ui,sans-serif}
+header{display:flex;align-items:baseline;gap:14px;padding:18px 24px 6px;flex-wrap:wrap}header h1{margin:0;font:800 28px "Nanum Myeongjo",serif}header span{color:var(--dim);font-size:13px}
+main{display:grid;grid-template-columns:400px minmax(0,1fr);gap:18px;padding:12px 24px 40px;max-width:1650px;margin:0 auto}
+@media(max-width:1050px){main{grid-template-columns:minmax(0,1fr);padding:12px 16px 40px}}
+.card{background:var(--p);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+h2{margin:0;font:700 18px "Nanum Myeongjo",serif}h2 small{font:400 12px "Noto Sans KR";color:var(--dim);margin-left:6px}
+label.f{display:grid;gap:4px;font-size:12px;color:var(--dim)}input[type=text],select,textarea{font:inherit;color:var(--ink);background:#0b0c0e;border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+textarea{resize:vertical;line-height:1.7}#script{min-height:300px}input[type=range]{accent-color:var(--acc2);width:100%}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{font:inherit;font-weight:700;color:var(--ink);background:var(--p2);border:1px solid var(--line);border-radius:9px;padding:10px 14px;cursor:pointer}.btn:hover{border-color:#555}.btn:disabled{opacity:.45;cursor:default}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}.btn.pri:hover{background:var(--acc2)}.btn.big{font-size:16px;padding:14px}
+.note{font-size:12px;color:var(--dim);margin:0}.row{display:flex;gap:8px;flex-wrap:wrap}.row .btn{flex:1}
+.stage{background:#000;border-radius:10px;overflow:hidden;border:1px solid var(--line)}#cv{display:block;width:100%;height:auto;aspect-ratio:16/9}
+.tl{display:flex;gap:10px;align-items:center}.tl input{flex:1}#tcode{font:600 13px ui-monospace,monospace;color:var(--dim);min-width:100px;text-align:right}
+#msg{background:#0b0c0e;border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-height:44px}#msg.busy::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--acc2);margin-right:8px;animation:bl 1s infinite}
+@keyframes bl{50%{opacity:.2}}#bar{height:6px;background:#0b0c0e;border-radius:3px;overflow:hidden}#bar i{display:block;height:100%;width:0;background:var(--acc2);transition:width .2s}
+details summary{cursor:pointer;color:var(--dim);font-size:13px}details[open]{display:flex;flex-direction:column;gap:8px}#ytOut{min-height:200px;font-size:12.5px}
+kbd{font:12px ui-monospace,monospace;background:#0b0c0e;border:1px solid var(--line);border-radius:4px;padding:0 5px}
+</style>
+</head>
+<body>
+<header><h1>괴담 스튜디오</h1><span>이야기 쓰기 → AI 목소리 낭독 → 무서운 화면·자막·배경음 → MP4 · 설치 없이 이 파일 하나로</span></header>
+<main>
+  <div class="col">
+    <section class="card">
+      <h2>① 이야기 <small>2ch 괴담 형식 창작</small></h2>
+      <div class="row"><button class="btn pri" id="bGen" type="button">🎲 새 괴담 쓰기</button><select id="base" style="flex:1"></select></div>
+      <textarea id="script" spellcheck="false" aria-label="원고"></textarea>
+      <div class="note" id="sInfo"></div>
+      <details><summary>원고 쓰는 법</summary><p class="note">첫 줄 <kbd># 제목</kbd> · 빈 줄 = 쉼 · <kbd>댓글:</kbd> 두 번째 목소리 · <kbd>남:</kbd> 남자 목소리<br><kbd>[장면:숲]</kbd> 숲·복도·신사·창문·골목·방·터널·편의점 · <kbd>[효과:노크]</kbd> 노크·발소리·심장·바람·종·전화·정적·문·차임 · <kbd>[쉼:2]</kbd></p></details>
+    </section>
+    <section class="card">
+      <h2>② 목소리 <small>AI 음성 · 이 브라우저에서 직접 생성</small></h2>
+      <div class="g2"><label class="f">낭독 목소리 <select id="vMain"></select></label><label class="f">빠르기 <span id="speedV"></span><input type="range" id="speed" min=".7" max="1.2" step=".02"></label></div>
+      <button class="btn" id="bTry" type="button">▶ 목소리 들어보기</button>
+      <label class="f">채널 이름 (화면 왼쪽 위·끝 화면) <input type="text" id="chan" maxlength="30" placeholder="예: 새벽괴담"></label>
+      <details><summary>더 보기 — 댓글·남자 목소리, 배경음, 해상도, 내 사진</summary>
+        <div class="g2"><label class="f">댓글 목소리 <select id="vSub"></select></label><label class="f">남자 대사 목소리 <select id="vMale"></select></label></div>
+        <div class="g2"><label class="f">배경음 크기 <input type="range" id="bgmV" min="0" max=".6" step=".01"></label><label class="f">해상도 <select id="res"><option value="1080">1080p</option><option value="720">720p (빠름)</option></select></label></div>
+        <label class="note">사진 추가 (장면 사이사이에 어둡게 보정해 넣음) <input type="file" id="imgIn" accept="image/*" multiple></label>
+      </details>
+      <p class="note">처음 한 번은 AI 목소리 파일(약 400MB)을 받습니다. 그다음부터는 저장된 걸 씁니다. 목소리: Supertonic(상업 이용 가능 · AI 음성 표기 필수 — 설명문에 자동으로 들어감).</p>
+    </section>
+  </div>
+  <div class="col">
+    <section class="card">
+      <div class="stage"><canvas id="cv" width="1920" height="1080"></canvas></div>
+      <div class="tl"><button class="btn" id="bPlay" type="button">▶ 미리보기</button><input type="range" id="seek" min="0" max="1000" value="0" aria-label="재생 위치"><span id="tcode">0:00 / 0:00</span></div>
+      <div class="row"><button class="btn pri big" id="bMake" type="button">🎬 ③ 영상 만들기</button><button class="btn big" id="bAuto" type="button">⚡ 새 괴담으로 한 번에 완성 (쓰기→만들기→저장)</button></div>
+      <div id="bar"><i></i></div>
+      <div id="msg">이야기를 고르거나 <b>🎲 새 괴담 쓰기</b>를 누른 뒤 <b>영상 만들기</b>를 누르세요.</div>
+      <div id="after" class="col" hidden style="gap:10px">
+        <div class="row"><button class="btn pri" id="bMP4" type="button">⇩ MP4 저장</button><button class="btn" id="bThumb" type="button">⇩ 썸네일</button><button class="btn" id="bYt" type="button">📋 유튜브 제목·설명·태그</button><button class="btn" id="bSrt" type="button">⇩ 자막</button></div>
+        <p class="note" id="codecNote">MP4는 영상 길이보다 빠르게 저장됩니다 (크롬·엣지). 저장한 파일을 휴대폰으로 옮겨 유튜브에 올리세요.</p>
+        <textarea id="ytOut" hidden aria-label="유튜브 설명문"></textarea>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.min.js"></script>
+<script>
+// =================== 무서운 장면 8종 (절차 생성 · 저작권 걱정 없음) ===================
+const SW = 1920, SH = 1080, OV = 1.12; // 카메라 이동 여유
+const mkC = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+function srng(seed) { let s = seed >>> 0 || 1; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
+const lerp = (a, b, t) => a + (b - a) * t;
+// 공용 텍스처
+const TEX = {};
+function texInit() {
+  if (TEX.grain) return;
+  TEX.grain = []; for (let k = 0; k < 6; k++) { const c = mkC(512, 512), x = c.getContext('2d'), d = x.createImageData(512, 512); for (let i = 0; i < d.data.length; i += 4) { const v = Math.random() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; } x.putImageData(d, 0, 0); TEX.grain.push(c); }
+  // 안개: 부드러운 덩어리
+  const f = mkC(1024, 512), fx = f.getContext('2d'), r = srng(7);
+  for (let i = 0; i < 140; i++) { const x = r() * 1024, y = 120 + r() * 300, rad = 60 + r() * 180, g = fx.createRadialGradient(x, y, 0, x, y, rad); g.addColorStop(0, `rgba(200,210,220,${.05 + r() * .06})`); g.addColorStop(1, 'rgba(200,210,220,0)'); fx.fillStyle = g; fx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    for (const dx of [-1024, 1024]) { fx.fillStyle = g; fx.save(); fx.translate(dx, 0); fx.fillRect(x - rad, y - rad, rad * 2, rad * 2); fx.restore(); } }
+  TEX.fog = f;
+  const v = mkC(SW, SH), vx = v.getContext('2d'), vg = vx.createRadialGradient(SW / 2, SH / 2, SH * .25, SW / 2, SH / 2, SH * .95); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(.7, 'rgba(0,0,0,.45)'); vg.addColorStop(1, 'rgba(0,0,0,.92)'); vx.fillStyle = vg; vx.fillRect(0, 0, SW, SH); TEX.vig = v;
+  TEX.static = []; for (let k = 0; k < 4; k++) { const c = mkC(320, 240), x = c.getContext('2d'), d = x.createImageData(320, 240); for (let i = 0; i < d.data.length; i += 4) { const q = Math.random() * 255 * (((i / 4 / 320) | 0) % 3 ? 1 : .7); d.data[i] = d.data[i + 1] = d.data[i + 2] = q; d.data[i + 3] = 255; } x.putImageData(d, 0, 0); TEX.static.push(c); }
+}
+// 사람 그림자 (서 있는 실루엣)
+function figure(x, cx, cy, h, col, lean = 0) {
+  x.save(); x.translate(cx, cy); x.rotate(lean); x.fillStyle = col; const w = h * .26;
+  x.beginPath(); x.ellipse(0, -h * .9, w * .3, w * .38, 0, 0, 6.283); x.fill(); // 머리
+  x.beginPath(); x.moveTo(-w * .18, -h * .8); x.quadraticCurveTo(-w * .62, -h * .74, -w * .55, -h * .45); x.lineTo(-w * .45, -h * .05); x.lineTo(-w * .2, 0); x.lineTo(-w * .05, -h * .4); x.lineTo(w * .05, -h * .4); x.lineTo(w * .2, 0); x.lineTo(w * .45, -h * .05); x.lineTo(w * .55, -h * .45); x.quadraticCurveTo(w * .62, -h * .74, w * .18, -h * .8); x.closePath(); x.fill();
+  x.restore();
+}
+function tree(x, r, bx, by, h, w, col) {
+  x.strokeStyle = col; x.fillStyle = col; x.lineCap = 'round';
+  x.beginPath(); x.moveTo(bx - w / 2, by); x.lineTo(bx - w * .2, by - h); x.lineTo(bx + w * .2, by - h); x.lineTo(bx + w / 2, by); x.fill();
+  const br = (sx, sy, ang, len, wid, d) => { if (d > 5 || len < 8) return; const ex = sx + Math.cos(ang) * len, ey = sy + Math.sin(ang) * len; x.lineWidth = wid; x.beginPath(); x.moveTo(sx, sy); x.quadraticCurveTo((sx + ex) / 2 + (r() - .5) * len * .3, (sy + ey) / 2 + (r() - .5) * len * .3, ex, ey); x.stroke();
+    const n = 2 + (r() * 2 | 0); for (let i = 0; i < n; i++) br(ex, ey, ang + (r() - .5) * 1.4, len * (.55 + r() * .2), wid * .62, d + 1); };
+  for (let i = 0; i < 7; i++) { const yy = by - h * (.35 + r() * .62), side = r() < .5 ? -1 : 1; br(bx, yy, -Math.PI / 2 + side * (.5 + r() * .9), h * (.15 + r() * .2), w * .3, 1); }
+  br(bx, by - h, -Math.PI / 2 + (r() - .5) * .4, h * .2, w * .3, 1);
+}
+const SCENES = {
+  숲(c, r) { const x = c.getContext('2d'), W = c.width, H = c.height;
+    const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#05080c'); g.addColorStop(.55, '#141d26'); g.addColorStop(1, '#06080a'); x.fillStyle = g; x.fillRect(0, 0, W, H);
+    for (let i = 0; i < 160; i++) { x.fillStyle = `rgba(200,210,230,${r() * .5})`; x.fillRect(r() * W, r() * H * .5, 1.5, 1.5); }
+    const mx = W * .7, my = H * .22, mg = x.createRadialGradient(mx, my, 20, mx, my, 360); mg.addColorStop(0, 'rgba(210,220,230,.35)'); mg.addColorStop(1, 'rgba(210,220,230,0)'); x.fillStyle = mg; x.fillRect(0, 0, W, H);
+    x.fillStyle = '#cfd6dc'; x.beginPath(); x.arc(mx, my, 62, 0, 6.283); x.fill(); x.fillStyle = 'rgba(120,130,140,.25)'; x.beginPath(); x.arc(mx - 18, my - 10, 14, 0, 6.283); x.arc(mx + 20, my + 16, 9, 0, 6.283); x.fill();
+    const layers = [['#1a222b', .55, 18], ['#0e1318', .75, 14], ['#050709', 1, 9]];
+    layers.forEach(([col, k, n], li) => { for (let i = 0; i < n; i++) tree(x, r, r() * W, H * (.78 + li * .08), H * (.45 + r() * .35) * k, (14 + r() * 26) * k, col);
+      x.fillStyle = col; x.fillRect(0, H * (.78 + li * .08) - 2, W, H); });
+    figure(x, W * .41, H * .855, H * .2, '#07090b');
+    return (o, t) => { o.globalAlpha = .55; const fx = (t * 18) % 1024; for (const y0 of [H * .52, H * .66]) for (let k = -1; k < 3; k++) o.drawImage(TEX.fog, k * 1024 - fx * (y0 > H * .6 ? 1.6 : 1), y0 - 256, 1024, 512); o.globalAlpha = 1; };
+  },
+  복도(c, r) { const x = c.getContext('2d'), W = c.width, H = c.height, vx = W * .5, vy = H * .46;
+    x.fillStyle = '#0b0b0a'; x.fillRect(0, 0, W, H);
+    const P = (d, sx, sy) => [vx + (sx - vx) * d, vy + (sy - vy) * d];
+    const quad = (pts, fill) => { x.fillStyle = fill; x.beginPath(); pts.forEach(([a, b], i) => i ? x.lineTo(a, b) : x.moveTo(a, b)); x.closePath(); x.fill(); };
+    const far = .09, fl = [[0, H], [W, H], P(far, W, H), P(far, 0, H)], ce = [[0, 0], [W, 0], P(far, W, 0), P(far, 0, 0)];
+    let g = x.createLinearGradient(0, H, 0, vy); g.addColorStop(0, '#2a2620'); g.addColorStop(1, '#070706'); quad(fl, g);
+    g = x.createLinearGradient(0, 0, 0, vy); g.addColorStop(0, '#1d1c19'); g.addColorStop(1, '#060605'); quad(ce, g);
+    g = x.createLinearGradient(0, 0, vx, 0); g.addColorStop(0, '#2f2c26'); g.addColorStop(1, '#080807'); quad([[0, 0], P(far, 0, 0), P(far, 0, H), [0, H]], g);
+    g = x.createLinearGradient(W, 0, vx, 0); g.addColorStop(0, '#2f2c26'); g.addColorStop(1, '#080807'); quad([[W, 0], P(far, W, 0), P(far, W, H), [W, H]], g);
+    for (let i = 0; i < 6; i++) { const d0 = 1 / (1 + i * .9), d1 = 1 / (1 + i * .9 + .32); // 문
+      for (const s of [0, W]) { const a = P(d0, s, H * .12), b = P(d1, s, H * .12), cc = P(d1, s, H), dd = P(d0, s, H); quad([a, b, cc, dd], 'rgba(20,18,15,.9)'); x.strokeStyle = 'rgba(80,72,60,.35)'; x.lineWidth = 2 * d0; x.stroke(); } }
+    for (let i = 0; i < 7; i++) { const d = 1 / (1 + i * .9 + .5), [lx, ly] = P(d, vx, 0), wd = 220 * d; x.fillStyle = i === 2 ? '#3a3a33' : '#d8d6c8'; x.fillRect(lx - wd / 2, ly - 8 * d, wd, 14 * d);
+      if (i !== 2) { const lg = x.createRadialGradient(lx, ly + 40 * d, 0, lx, ly + 200 * d, 520 * d); lg.addColorStop(0, 'rgba(230,228,210,.16)'); lg.addColorStop(1, 'rgba(230,228,210,0)'); x.fillStyle = lg; x.fillRect(0, 0, W, H); } }
+    const [ex, ey] = P(far, 0, 0), [fx2, fy2] = P(far, W, H); x.fillStyle = '#020202'; x.fillRect(ex, ey, fx2 - ex, fy2 - ey);
+    x.fillStyle = 'rgba(160,60,30,.5)'; x.fillRect(vx - 18, fy2 - 6, 36, 4);
+    figure(x, vx + 6, fy2, (fy2 - ey) * .82, '#000');
+    return (o, t) => { const fl1 = Math.sin(t * 37) * Math.sin(t * 13.3) > .55 ? .5 : 0, fl2 = (Math.sin(t * 2.1) > .97) ? .35 : 0; if (fl1 + fl2) { o.fillStyle = `rgba(0,0,0,${fl1 + fl2})`; o.fillRect(0, 0, SW, SH); } };
+  },
+  신사(c, r) { const x = c.getContext('2d'), W = c.width, H = c.height;
+    const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0a0203'); g.addColorStop(.6, '#3a0b0a'); g.addColorStop(1, '#0b0303'); x.fillStyle = g; x.fillRect(0, 0, W, H);
+    const mx = W * .5, my = H * .34, mg = x.createRadialGradient(mx, my, 60, mx, my, 520); mg.addColorStop(0, 'rgba(255,90,60,.45)'); mg.addColorStop(1, 'rgba(255,60,40,0)'); x.fillStyle = mg; x.fillRect(0, 0, W, H);
+    x.fillStyle = '#d4563c'; x.beginPath(); x.arc(mx, my, 150, 0, 6.283); x.fill(); x.fillStyle = 'rgba(120,20,10,.25)'; for (let i = 0; i < 9; i++) { x.beginPath(); x.arc(mx + (r() - .5) * 200, my + (r() - .5) * 200, 10 + r() * 30, 0, 6.283); x.fill(); }
+    const k = '#070102'; x.fillStyle = k;
+    for (const s of [-1, 1]) for (let i = 0; i < 6; i++) tree(x, r, mx + s * (W * .28 + r() * W * .25), H * .95, H * (.5 + r() * .3), 20 + r() * 20, k);
+    // 계단
+    for (let i = 0; i < 14; i++) { const y = H * .72 + i * i * 1.6, w = 160 + i * 34; x.fillStyle = i % 2 ? '#120404' : '#0a0202'; x.fillRect(mx - w / 2, y, w, 14 + i * 2); }
+    // 도리이
+    const tw = 520, th = 520, ty = H * .74; x.fillStyle = k;
+    x.fillRect(mx - tw * .36 - 18, ty - th, 36, th); x.fillRect(mx + tw * .36 - 18, ty - th, 36, th);
+    x.beginPath(); x.moveTo(mx - tw * .62, ty - th - 26); x.quadraticCurveTo(mx, ty - th + 6, mx + tw * .62, ty - th - 26); x.lineTo(mx + tw * .58, ty - th + 14); x.quadraticCurveTo(mx, ty - th + 40, mx - tw * .58, ty - th + 14); x.fill();
+    x.fillRect(mx - tw * .48, ty - th + 70, tw * .96, 26); x.fillRect(mx - 12, ty - th + 20, 24, 60);
+    for (const s of [-1, 1]) { const lx = mx + s * 330, ly = H * .86; x.fillRect(lx - 14, ly - 120, 28, 120); x.fillRect(lx - 40, ly - 160, 80, 44); x.fillRect(lx - 52, ly - 176, 104, 18); x.fillStyle = 'rgba(255,140,60,.35)'; x.fillRect(lx - 26, ly - 152, 52, 28); x.fillStyle = k; }
+    figure(x, mx, ty - 6, 120, '#020000');
+    return (o, t) => { o.globalAlpha = .35; const fx = (t * 12) % 1024; for (let q = -1; q < 3; q++) o.drawImage(TEX.fog, q * 1024 - fx, SH * .6, 1024, 512); o.globalAlpha = 1;
+      const p = .06 + Math.sin(t * .8) * .04; o.fillStyle = `rgba(120,10,0,${p})`; o.fillRect(0, 0, SW, SH); };
+  },
+  창문(c, r) { const x = c.getContext('2d'), W = c.width, H = c.height;
+    x.fillStyle = '#0b0d10'; x.fillRect(0, 0, W, H);
+    const wx = W * .3, wy = H * .14, ww = W * .4, wh = H * .62;
+    const g = x.createLinearGradient(0, wy, 0, wy + wh); g.addColorStop(0, '#16202b'); g.addColorStop(1, '#0b1015'); x.fillStyle = g; x.fillRect(wx, wy, ww, wh);
+    for (let i = 0; i < 18; i++) { x.fillStyle = `rgba(255,200,120,${.15 + r() * .3})`; x.fillRect(wx + r() * ww, wy + wh * (.55 + r() * .2), 3, 3); }
+    x.fillStyle = '#0a0e12'; x.fillRect(wx, wy + wh * .7, ww, wh * .3);
+    figure(x, wx + ww * .62, wy + wh * .92, wh * .42, '#040506');
+    x.fillStyle = '#1b1712'; x.fillRect(wx - 30, wy - 30, ww + 60, 30); x.fillRect(wx - 30, wy + wh, ww + 60, 40); x.fillRect(wx - 30, wy, 30, wh); x.fillRect(wx + ww, wy, 30, wh); x.fillRect(wx + ww / 2 - 9, wy, 18, wh); x.fillRect(wx, wy + wh / 2 - 9, ww, 18);
+    x.fillStyle = 'rgba(80,90,110,.08)'; x.fillRect(0, wy + wh + 40, W, H);
+    const drops = Array.from({ length: 160 }, () => [wx + r() * ww, r() * wh, 20 + r() * 50, 300 + r() * 500]);
+    return (o, t, cam) => { o.save(); o.setTransform(cam.s, 0, 0, cam.s, cam.x, cam.y); o.beginPath(); o.rect(wx, wy, ww, wh); o.clip(); o.strokeStyle = 'rgba(170,190,210,.28)'; o.lineWidth = 1.5;
+      for (const [dx, dy, len, sp] of drops) { const yy = wy + (dy + t * sp) % wh; o.beginPath(); o.moveTo(dx, yy); o.lineTo(dx - 3, yy + len); o.stroke(); } o.restore();
+      const ph = t % 11; if (ph > 9.6 && ph < 9.75 || ph > 9.85 && ph < 9.92) { o.fillStyle = 'rgba(200,215,240,.32)'; o.fillRect(0, 0, SW, SH); } };
+  },
+  골목(c, r) { const x = c.getContext('2d'), W = c.width, H = c.height, vx = W * .52, vy = H * .5;
+    x.fillStyle = '#07090b'; x.fillRect(0, 0, W, H);
+    x.fillStyle = '#0d1116'; x.beginPath(); x.moveTo(0, 0); x.lineTo(vx - 90, vy - 120); x.lineTo(vx - 90, vy + 60); x.lineTo(0, H); x.fill();
+    x.beginPath(); x.moveTo(W, 0); x.lineTo(vx + 90, vy - 120); x.lineTo(vx + 90, vy + 60); x.lineTo(W, H); x.fill();
+    x.fillStyle = '#0a0c0e'; x.beginPath(); x.moveTo(0, H); x.lineTo(vx - 90, vy + 60); x.lineTo(vx + 90, vy + 60); x.lineTo(W, H); x.fill();
+    for (let i = 0; i < 40; i++) { const s = r() < .5 ? -1 : 1, d = r(); x.strokeStyle = 'rgba(40,46,54,.35)'; x.lineWidth = 2; const y0 = r() * H; x.beginPath(); x.moveTo(s < 0 ? lerp(0, vx - 90, d) : lerp(W, vx + 90, d), lerp(y0, vy - 30, d)); x.lineTo(s < 0 ? lerp(0, vx - 90, d + .05) : lerp(W, vx + 90, d + .05), lerp(y0, vy - 30, d + .05)); x.stroke(); }
+    const lx = vx + 40, ly = vy - 60; x.strokeStyle = '#030405'; x.lineWidth = 6; x.beginPath(); x.moveTo(lx + 30, vy + 60); x.lineTo(lx + 30, ly); x.lineTo(lx, ly); x.stroke();
+    x.strokeStyle = 'rgba(0,0,0,.8)'; x.lineWidth = 2; for (let i = 0; i < 3; i++) { x.beginPath(); x.moveTo(0, 120 + i * 30); x.quadraticCurveTo(W * .3, 260 + i * 30, lx + 30, ly + 4 + i * 4); x.stroke(); }
+    const cg = x.createRadialGradient(lx, vy + 60, 4, lx, vy + 60, 260); cg.addColorStop(0, 'rgba(255,220,150,.32)'); cg.addColorStop(1, 'rgba(255,220,150,0)'); x.fillStyle = cg; x.fillRect(0, 0, W, H);
+    x.fillStyle = 'rgba(255,220,160,.09)'; x.beginPath(); x.moveTo(lx - 6, ly + 4); x.lineTo(lx - 90, vy + 64); x.lineTo(lx + 80, vy + 64); x.closePath(); x.fill();
+    x.fillStyle = '#ffe0a0'; x.fillRect(lx - 8, ly, 16, 6);
+    figure(x, lx - 10, vy + 62, 96, '#020203');
+    const rg = x.createRadialGradient(lx, vy + 140, 10, lx, vy + 140, 200); rg.addColorStop(0, 'rgba(255,220,150,.10)'); rg.addColorStop(1, 'rgba(255,220,150,0)'); x.fillStyle = rg; x.save(); x.scale(1, 1); x.fillRect(lx - 200, vy + 64, 400, 300); x.restore();
+    return (o, t) => { const f = Math.sin(t * 23) * Math.sin(t * 7.7) > .6 ? .45 : 0; if (f) { o.fillStyle = `rgba(0,0,0,${f})`; o.fillRect(0, 0, SW, SH); }
+      o.globalAlpha = .3; const fx = (t * 10) % 1024; for (let q = -1; q < 3; q++) o.drawImage(TEX.fog, q * 1024 - fx, SH * .5, 1024, 512); o.globalAlpha = 1; };
+  },
+  방(c, r) { const x = c.getContext('2d'), W = c.width, H = c.height;
+    x.fillStyle = '#050607'; x.fillRect(0, 0, W, H);
+    x.fillStyle = '#08090a'; x.fillRect(0, H * .72, W, H);
+    const tx = W * .5, ty = H * .55, tw = 360, th = 270;
+    const gl = x.createRadialGradient(tx, ty, 50, tx, ty + 120, 900); gl.addColorStop(0, 'rgba(150,180,210,.22)'); gl.addColorStop(1, 'rgba(150,180,210,0)'); x.fillStyle = gl; x.fillRect(0, 0, W, H);
+    x.fillStyle = '#121212'; x.fillRect(tx - tw / 2 - 30, ty - th / 2 - 26, tw + 60, th + 52); x.fillStyle = '#1b1b1b'; x.fillRect(tx - 260, ty + th / 2 + 26, 520, 30); x.fillRect(tx - 240, ty + th / 2 + 56, 20, 130); x.fillRect(tx + 220, ty + th / 2 + 56, 20, 130);
+    x.fillStyle = '#000'; x.fillRect(tx - tw / 2, ty - th / 2, tw, th);
+    figure(x, W * .16, H * .9, H * .55, '#020202', .02);
+    return (o, t, cam) => { const k = (t * 24 | 0) % 4; o.save(); o.setTransform(cam.s, 0, 0, cam.s, cam.x, cam.y); o.globalAlpha *= .85; o.drawImage(TEX.static[k], tx - tw / 2, ty - th / 2, tw, th); o.globalAlpha = 1; o.restore();
+      const p = .05 + Math.random() * .05; o.fillStyle = `rgba(160,190,220,${p})`; o.fillRect(0, 0, SW, SH); };
+  },
+  터널(c, r) { const x = c.getContext('2d'), W = c.width, H = c.height, vx = W * .5, vy = H * .5;
+    const bg = x.createRadialGradient(vx, vy, 10, vx, vy, W * .62); bg.addColorStop(0, '#000'); bg.addColorStop(.25, '#0d0c0a'); bg.addColorStop(1, '#2e2a23'); x.fillStyle = bg; x.fillRect(0, 0, W, H);
+    for (let i = 0; i < 22; i++) { const d = 1 / (1 + i * .42), rx = W * .58 * d, ry = H * .66 * d, cy = vy + H * .2 * d;
+      x.strokeStyle = `rgba(0,0,0,${.35 + i * .02})`; x.lineWidth = Math.max(1, 16 * d); x.beginPath(); x.ellipse(vx, cy, rx, ry, 0, Math.PI, 0); x.stroke();
+      if (i % 2 === 0) for (const sd of [-1, 1]) { const ang = Math.PI + (sd > 0 ? Math.PI * .82 : Math.PI * .18), lx = vx + Math.cos(ang) * rx, ly = cy + Math.sin(ang) * ry, lg = x.createRadialGradient(lx, ly, 0, lx, ly, 140 * d);
+        lg.addColorStop(0, i === 6 ? 'rgba(255,150,60,.15)' : 'rgba(255,150,60,.6)'); lg.addColorStop(1, 'rgba(255,150,60,0)'); x.fillStyle = lg; x.fillRect(lx - 150 * d, ly - 150 * d, 300 * d, 300 * d); x.fillStyle = '#ffcf8a'; x.fillRect(lx - 10 * d, ly - 3 * d, 20 * d, 6 * d); } }
+    const fg = x.createLinearGradient(0, vy + 20, 0, H); fg.addColorStop(0, '#050505'); fg.addColorStop(1, '#151412'); x.fillStyle = fg; x.beginPath(); x.moveTo(0, H); x.lineTo(vx - 40, vy + 22); x.lineTo(vx + 40, vy + 22); x.lineTo(W, H); x.fill();
+    x.strokeStyle = 'rgba(210,190,120,.35)'; x.lineWidth = 5; x.setLineDash([60, 70]); x.beginPath(); x.moveTo(vx, H); x.lineTo(vx, vy + 24); x.stroke(); x.setLineDash([]);
+    figure(x, vx - 26, vy + 34, 46, '#000');
+    return (o, t) => { const f = Math.sin(t * 5.3) * Math.sin(t * 17) > .7 ? .3 : 0; if (f) { o.fillStyle = `rgba(0,0,0,${f})`; o.fillRect(0, 0, SW, SH); } };
+  },
+  편의점(c, r) { const x = c.getContext('2d'), W = c.width, H = c.height;
+    const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#04060a'); g.addColorStop(1, '#0b0d10'); x.fillStyle = g; x.fillRect(0, 0, W, H);
+    for (let i = 0; i < 6; i++) tree(x, r, r() * W * .3, H * .62, H * (.25 + r() * .2), 10 + r() * 10, '#020304');
+    const bx = W * .38, by = H * .3, bw = W * .5, bh = H * .34;
+    x.fillStyle = '#15171a'; x.fillRect(bx - 20, by - 70, bw + 40, bh + 90);
+    x.fillStyle = '#d9dcd6'; x.fillRect(bx, by - 56, bw, 40); x.fillStyle = '#2e7a48'; x.fillRect(bx, by - 30, bw, 10); x.fillStyle = '#b33a2c'; x.fillRect(bx, by - 20, bw, 6);
+    const lg = x.createLinearGradient(0, by, 0, by + bh); lg.addColorStop(0, '#e6efe9'); lg.addColorStop(1, '#b9c6bf'); x.fillStyle = lg; x.fillRect(bx, by, bw, bh);
+    x.fillStyle = 'rgba(40,60,50,.35)'; for (let i = 0; i < 5; i++) x.fillRect(bx + 30 + i * bw / 5, by + bh * .35, bw / 5 - 60, bh * .5);
+    x.fillStyle = '#1a1c1e'; for (let i = 1; i < 6; i++) x.fillRect(bx + i * bw / 6 - 3, by, 6, bh);
+    figure(x, bx + bw * .7, by + bh - 4, bh * .7, 'rgba(10,14,12,.85)');
+    const sg = x.createLinearGradient(0, by + bh, 0, H); sg.addColorStop(0, 'rgba(220,235,225,.35)'); sg.addColorStop(1, 'rgba(220,235,225,0)'); x.fillStyle = sg; x.beginPath(); x.moveTo(bx, by + bh); x.lineTo(bx + bw, by + bh); x.lineTo(bx + bw + 300, H); x.lineTo(bx - 300, H); x.fill();
+    x.fillStyle = '#0a0b0c'; x.fillRect(0, by + bh, bx - 20, H);
+    x.fillStyle = '#d8dbd6'; x.fillRect(W * .14, by + 20, 14, bh + 40); x.fillStyle = '#e9ece6'; x.fillRect(W * .14 - 50, by - 30, 114, 60);
+    return (o, t) => { const f = Math.sin(t * 41) * Math.sin(t * 3.1) > .8 ? .22 : 0; if (f) { o.fillStyle = `rgba(0,0,0,${f})`; o.fillRect(0, 0, SW, SH); } };
+  },
+};
+const SCENE_IDS = Object.keys(SCENES);
+// 장면 객체: 기본 그림(한 번) + 움직이는 효과
+function makeScene(id, seed, img) {
+  texInit(); const c = mkC(Math.round(SW * OV), Math.round(SH * OV)), r = srng(seed);
+  let anim = () => { };
+  if (img) { const x = c.getContext('2d'), s = Math.max(c.width / img.width, c.height / img.height); x.drawImage(img, (c.width - img.width * s) / 2, (c.height - img.height * s) / 2, img.width * s, img.height * s);
+    x.globalCompositeOperation = 'saturation'; x.fillStyle = 'hsl(0,0%,50%)'; x.globalAlpha = .7; x.fillRect(0, 0, c.width, c.height); x.globalAlpha = 1; x.globalCompositeOperation = 'multiply'; x.fillStyle = '#5c6670'; x.fillRect(0, 0, c.width, c.height); x.globalCompositeOperation = 'source-over'; }
+  else anim = SCENES[id](c, r) || anim;
+  return { id, c, anim, seed };
+}
+// 한 프레임 그리기: 장면 a(→b 전환), 진행 u(0~1), 시간 t
+function drawScene(o, sc, t, u, alpha = 1, drift = 0) {
+  const s = 1 / OV * (1 + u * .07), dx = (Math.sin(sc.seed + drift) * .5 + .5) * (sc.c.width * s - SW) * -1, dy = (sc.c.height * s - SH) * -(.3 + u * .4);
+  const cam = { s, x: dx * (1 - u) + (SW - sc.c.width * s) / 2 * u, y: dy };
+  o.globalAlpha = alpha; o.setTransform(cam.s, 0, 0, cam.s, cam.x, cam.y); o.drawImage(sc.c, 0, 0); o.setTransform(1, 0, 0, 1, 0, 0);
+  if (alpha >= .999) sc.anim(o, t, cam); else { o.save(); o.globalAlpha = alpha; sc.anim(o, t, cam); o.restore(); }
+  o.globalAlpha = 1;
+}
+function drawFX(o, t, glitch) {
+  o.drawImage(TEX.vig, 0, 0);
+  const gk = TEX.grain[(t * 24 | 0) % TEX.grain.length]; o.save(); o.globalCompositeOperation = 'overlay'; o.globalAlpha = .22; const ox = -(t * 977 % 512), oy = -(t * 613 % 512); for (let x = ox; x < SW; x += 512) for (let y = oy; y < SH; y += 512) o.drawImage(gk, x, y); o.restore();
+  o.fillStyle = 'rgba(20,40,50,.10)'; o.fillRect(0, 0, SW, SH);
+  if (glitch > 0) { o.save(); o.globalAlpha = Math.min(1, glitch); o.drawImage(TEX.static[(t * 30 | 0) % 4], 0, 0, SW, SH); o.restore(); }
+}
+
+// =================== 기본 원고 : 2ch 괴담 형식의 창작 이야기 (픽션) ===================
+// 문법: 첫 줄 "# 제목" · 빈 줄 = 잠깐 쉼 · "댓글:" = 두 번째 목소리 · "남:" "여:" = 그 목소리로
+//       [장면:숲|복도|신사|창문|골목|방|터널|편의점] · [효과:노크|발소리|심장|바람|종|전화|정적|문|차임] · [쉼:2]
+const STORIES = [
+`# 야간 편의점 매뉴얼
+[장면:편의점]
+오늘 읽어드릴 이야기는, 일본의 한 익명 게시판 오컬트판에 올라온 스레드 형식의 이야기입니다.
+제목은, 야간 편의점 매뉴얼.
+
+대학 다닐 때 반년 정도, 시골 국도변 편의점에서 야간 알바를 했었다.
+지금 생각하면 이상한 가게였는데, 그때는 시급이 좋아서 별생각이 없었다.
+
+첫날, 점장이 코팅된 종이 한 장을 건넸다.
+보통 매뉴얼은 계산대 쓰는 법이나 폐기 처리 같은 게 적혀 있잖아.
+그런데 그 종이에는 딱 다섯 줄만 적혀 있었다.
+
+[효과:차임]
+첫째. 새벽 두 시부터 네 시 사이에, 자동문이 저절로 열리면 어서 오세요라고 말하지 말 것.
+둘째. 음료 냉장고 뒤쪽에서 노크 소리가 나면, 세 번까지는 무시할 것.
+셋째. 우산을 빌려 달라는 손님에게는, 우산을 빌려주지 말 것. 비가 오지 않는 날이라면 더더욱.
+넷째. 거울 같은 유리창에 비친 손님 수와, 가게 안 손님 수가 다르면, 다른 쪽을 믿을 것.
+다섯째. 이 종이를 잃어버렸다면, 그날은 바로 퇴근할 것.
+
+댓글: 규칙 괴담 냄새가 난다
+댓글: 점장 표정은 어땠어?
+
+점장은 웃지도 않았다.
+그냥 장난이라고 생각해 달라고, 그래도 지켜 달라고만 했다.
+
+[장면:방]
+처음 한 달은 아무 일도 없었다.
+트럭 기사 몇 명, 술 취한 대학생, 고양이 사료를 사러 오는 할아버지.
+그 정도가 전부였다.
+
+이상한 일이 처음 생긴 건 장마가 끝난 다음 주였다.
+새벽 두 시 사십 분쯤.
+[효과:차임]
+자동문이 열렸다.
+밖에는 아무도 없었다.
+나는 반사적으로 어서 오세요, 라고 말할 뻔했다가, 입을 다물었다.
+
+문은 한참 동안 열려 있었다.
+센서 앞에 누가 서 있는 것처럼.
+그리고 아주 천천히, 닫혔다.
+
+그 순간 가게 안이 조금 추워진 느낌이 들었다.
+진열대 사이 통로 끝, 잡지 코너 쪽에서, 바닥을 끄는 듯한 소리가 났다.
+[효과:발소리]
+나는 계산대 밖으로 나가지 않았다.
+매뉴얼에는 나가지 말라는 말은 없었지만, 그냥, 나가면 안 될 것 같았다.
+
+댓글: 그거 들어온 거 아니냐
+댓글: 어서 오세요라고 했으면 어떻게 됐을까
+
+[장면:복도]
+그 일이 있고 나서부터, 노크가 시작됐다.
+음료 냉장고 뒤쪽은 창고와 이어지는 좁은 통로라서, 사람이 들어갈 틈이 없다.
+그런데 거기서.
+[효과:노크]
+똑, 똑, 똑.
+한 번.
+[효과:노크]
+두 번.
+[효과:노크]
+세 번.
+나는 매뉴얼대로 무시했다.
+네 번째는 오지 않았다.
+대신, 냉장고 안쪽, 우유 팩 사이로 손가락 같은 것이 하나, 천천히 들어갔다가 나왔다.
+
+[쉼:1.5]
+그날 아침 점장에게 말했더니, 점장은 메모장에 날짜를 적고 이렇게만 물었다.
+세 번에서 멈췄냐고.
+멈췄다고 하니까, 그럼 됐다고 했다.
+
+[장면:창문]
+진짜 문제는 비가 오지 않는 밤에 생겼다.
+새벽 세 시 반쯤, 정장을 입은 여자 손님이 들어왔다.
+머리부터 어깨까지 흠뻑 젖어 있었다.
+밖은 별이 보일 만큼 맑았는데.
+
+여: 우산, 하나만 빌려주실 수 있나요.
+
+목소리가 이상하게 가까웠다.
+계산대 건너편에 서 있는데, 귓가에서 말하는 것 같았다.
+나는 판매용 비닐우산을 가리키면서, 대여는 안 되고 구매만 가능하다고 했다.
+
+여: 빌려주시면, 꼭 돌려드릴게요. 꼭, 돌려드리러 올게요.
+
+그 말을 세 번 반복했다.
+나는 끝까지 안 된다고 했다.
+여자는 아무것도 사지 않고 나갔는데, 자동문이 열리지 않았다.
+그냥, 유리문 앞에서 사라졌다.
+바닥에는 물자국이 문 앞에서 계산대까지만, 한 방향으로 나 있었다.
+
+댓글: 나가는 발자국이 없다는 거네
+댓글: 빌려줬으면 진짜로 돌려주러 왔겠지. 매일.
+
+[장면:편의점]
+그리고 마지막 날.
+그날은 손님이 한 명 있었다.
+작업복을 입은 남자가 컵라면 코너 앞에서 오래 고민하고 있었다.
+무심코 정면 유리창을 봤다.
+밤이라 유리가 거울처럼 가게 안을 비추고 있었는데.
+유리 속에는, 그 남자 뒤에 두 명이 더 서 있었다.
+
+[효과:심장]
+고개를 돌려 가게 안을 봤다.
+남자 혼자였다.
+다시 유리를 봤다.
+세 명이었다.
+그리고 그중 한 명이, 유리 속에서, 나를 보고 있었다.
+
+매뉴얼에는, 다른 쪽을 믿으라고 적혀 있었다.
+그런데 어느 쪽이 다른 쪽인지, 그 순간 갑자기 모르겠는 거다.
+나는 주머니를 뒤졌다.
+코팅된 종이가 없었다.
+
+[효과:정적]
+다섯째. 이 종이를 잃어버렸다면, 그날은 바로 퇴근할 것.
+
+나는 앞치마를 벗고, 그대로 뒷문으로 나왔다.
+점장에게 전화하니, 신호가 한 번 가자마자 받았다.
+점장은 내가 아무 말도 하기 전에, 수고했다고, 이번 달 급여는 넣어 두겠다고 했다.
+
+다음 날 가 보니, 그 편의점은 공사 가림막에 둘러싸여 있었다.
+점장 번호는 없는 번호가 되어 있었다.
+급여는, 정말로 들어와 있었다.
+입금자 이름 칸에는, 한자로 이렇게 적혀 있었다.
+돌려드립니다.
+
+[쉼:1.5]
+댓글: 우산 여자다
+댓글: 결국 뭔가는 돌려받은 거네
+
+오늘 이야기는 여기까지입니다.
+여러분이 일하는 가게에도, 이상하게 짧은 매뉴얼이 있지는 않은가요.`,
+
+`# 뒷산의 빨간 끈
+[장면:숲]
+오늘 이야기는, 시골 할머니 댁에서 여름을 보냈다는 한 사람의 글입니다.
+제목은, 뒷산의 빨간 끈.
+
+초등학교 오 학년 여름방학, 부모님 사정으로 한 달 동안 외가에 맡겨졌다.
+산골 마을이었다.
+집이 열 채 정도, 버스는 하루 두 번.
+
+할머니 집 뒤에는 낮은 산이 있었는데, 산으로 올라가는 길 입구의 나무들에 빨간 끈이 묶여 있었다.
+천으로 된, 손가락 굵기쯤 되는 끈.
+나무 한 그루에 하나씩, 산 위쪽으로 쭉 이어져 있었다.
+
+할머니는 처음 도착한 날 저녁에, 규칙을 두 개 말해 줬다.
+
+여: 해 지고 나서는 뒷산에 올라가지 마라.
+여: 그리고 산에서 종소리가 나면, 무슨 일이 있어도 뒤를 돌아보면 안 된다.
+
+댓글: 시골 괴담 정석이네
+댓글: 종소리라는 게 절에서 나는 거?
+
+근처에 절은 없었다.
+나도 그게 궁금해서 물었는데, 할머니는 대답 대신 내 손목에 빨간 끈을 하나 묶어 줬다.
+나무에 묶인 것과 똑같은 끈이었다.
+
+[장면:신사]
+산 중턱에는 작은 사당이 있었다.
+낮에 사촌 형이랑 몇 번 올라가 봤는데, 사당이라기엔 너무 작았다.
+나무 상자 같은 것 안에, 얼굴이 지워진 돌 인형이 하나 있었다.
+돌 인형의 목에도 빨간 끈이 감겨 있었다.
+
+사촌 형은 마을 애들 사이에 내려오는 이야기를 해 줬다.
+옛날에 이 산에서 아이가 한 명 사라졌는데, 어른들이 밤새 찾아도 못 찾았다고.
+다음 날 아침, 그 아이는 산 입구에 서 있었는데, 뒤를 보고 서 있었다고.
+얼굴이 있어야 할 쪽으로 뒷머리가, 뒷머리가 있어야 할 쪽으로 얼굴이.
+
+댓글: 아 그 묘사 싫다
+댓글: 그래서 돌 인형 얼굴이 없는 거구나
+
+[장면:숲]
+일이 생긴 건 방학이 끝나기 사흘 전이었다.
+사촌 형이랑 개울에서 놀다가, 시간 가는 줄 몰랐다.
+정신 차려 보니 해가 산 너머로 넘어가고 있었다.
+집으로 가는 지름길이 뒷산 입구를 지나가는 길이었다.
+
+형이 뛰자고 했다.
+우리는 빨간 끈이 묶인 나무들 옆을 지나 뛰었다.
+그때.
+[효과:종]
+산 위쪽에서, 종소리가 났다.
+맑은 소리였다.
+작은 종을 손으로 흔드는 것 같은.
+
+[효과:종]
+두 번째 종소리는, 조금 더 가까웠다.
+형이 내 손목을 꽉 잡았다.
+돌아보지 마, 라고 형이 말했다.
+목소리가 떨리고 있었다.
+
+[효과:발소리]
+뒤에서 누가 따라오고 있었다.
+발소리가 우리랑 똑같은 박자였다.
+우리가 빨리 가면 빨리, 천천히 가면 천천히.
+[효과:종]
+종소리는 이제 바로 뒤에서 났다.
+
+그리고 내 이름을 불렀다.
+할머니 목소리로.
+
+여: 얘야, 그쪽 아니다. 이리 와라.
+
+다리가 멈출 뻔했다.
+할머니 목소리였다.
+정말로, 분명히.
+그런데 할머니는 무릎이 아파서 산 근처에는 오지 않는다.
+그리고 할머니는 나를 얘야, 라고 부른 적이 없었다.
+
+[효과:심장]
+형이 소리를 질렀다.
+그냥 뛰라고.
+나는 눈을 감다시피 하고 뛰었다.
+손목에 묶인 빨간 끈이, 누가 잡아당기는 것처럼 뒤쪽으로 팽팽해졌다.
+그리고, 툭, 끊어졌다.
+
+[장면:방]
+집에 도착하니 할머니가 마당에 서 있었다.
+할머니는 내 손목을 보더니, 아무 말 없이 부엌에서 소금을 가져와 내 등에 뿌렸다.
+그리고 형한테, 너는 끈이 그대로냐고 물었다.
+형의 손목에는, 끈이 그대로 있었다.
+
+그날 밤, 할머니가 새 끈을 묶어 주면서 이렇게 말했다.
+
+여: 끈이 끊어진 건, 네 대신 끊어진 거다. 이번 한 번은 그걸로 됐다.
+
+[쉼:1.2]
+그다음 날 아침, 산 입구 첫 번째 나무를 봤다.
+빨간 끈이 하나 더 늘어 있었다.
+끊어진 자리를 다시 묶은 것 같은 매듭이 있는, 내 손목에 있던 바로 그 끈이었다.
+
+댓글: 그럼 종 들고 따라온 건 누군데
+댓글: 형은 왜 괜찮았던 거지
+
+그건 나도 모른다.
+다만 그 뒤로 이십 년 동안, 할머니 장례식 때 딱 한 번 그 마을에 갔다.
+산 입구의 나무들에는, 여전히 빨간 끈이 묶여 있었다.
+그런데 수가 이상했다.
+내가 기억하는 것보다, 한참 많았다.
+
+오늘 이야기는 여기까지입니다.
+혹시 어딘가에서 종소리가 들리더라도, 돌아보지는 마세요.`,
+
+`# 설계도에 없는 문
+[장면:골목]
+오늘은, 싼 집에 이사한 어느 회사원의 이야기입니다.
+제목은, 설계도에 없는 문.
+
+작년에 전근 때문에 오래된 맨션으로 이사했다.
+역에서 십오 분, 원룸, 시세의 절반.
+부동산에서 고지 사항은 없다고 했다.
+사고 물건이 아니라는 뜻이다.
+
+다만 계약할 때 담당자가 이상한 말을 하나 했다.
+남: 복도 끝 비상구 쪽은, 가급적 쓰지 마세요. 오래돼서 문이 잘 안 맞습니다.
+
+댓글: 이미 복선
+댓글: 시세 반값에 고지 사항 없음은 오히려 무섭지
+
+[장면:복도]
+내 방은 사 층, 복도 가운데쯤이었다.
+복도는 길고 형광등이 반쯤 나가 있었다.
+끝에 철문이 하나 있었는데, 그게 비상구였다.
+처음엔 신경도 안 썼다.
+
+이사하고 이 주쯤 지났을 때, 관리 회사에서 소방 점검 안내문이 왔다.
+안내문 뒷면에 층별 평면도가 인쇄돼 있었다.
+무심코 내 층을 봤다.
+복도 끝은 그냥 벽으로 그려져 있었다.
+비상구는, 반대쪽 계단 옆에 있었다.
+
+[쉼:1]
+그럼 복도 끝 그 철문은 뭐지.
+
+댓글: 설계도에 없는 문 나왔다
+댓글: 열어 봤냐
+
+물론 바로 열어 보진 않았다.
+퇴근할 때마다 그 문을 봤다.
+페인트가 벗겨진 회색 철문.
+손잡이는 없고, 열쇠 구멍만 있었다.
+그리고 문 아래 틈으로, 가끔 빛이 새어 나왔다.
+형광등 빛이 아니라, 주황색, 저녁 햇빛 같은 빛.
+밤 열한 시에도.
+
+[장면:창문]
+한 달쯤 지났을 때, 옆방 사람과 처음으로 마주쳤다.
+나이 든 남자였는데, 쓰레기를 내놓다가 내가 그 문을 보고 있는 걸 보고는, 말을 걸었다.
+
+남: 그 문, 노크하지 마세요.
+남: 노크하면, 대답하거든요.
+
+농담인 줄 알았다.
+그런데 그 사람은 진지했다.
+자기는 여기 산 지 십이 년째인데, 그동안 이 층에 들어온 사람 중에 세 명이 노크를 했다고.
+그리고 세 명 다, 이사를 갔다고.
+아니, 정확히는, 이사 간 걸로 되어 있다고.
+
+댓글: 이사 간 걸로 되어 있다가 제일 무섭다
+댓글: 스레드 주인 노크할 것 같은데
+
+[장면:복도]
+노크는 안 했다.
+대신 그날 밤, 이상한 걸 들었다.
+새벽 한 시쯤, 복도에서.
+[효과:노크]
+똑, 똑.
+내 방 문이 아니었다.
+복도 끝, 그 철문 쪽이었다.
+누가 그 문을 두드리고 있었다.
+안쪽에서.
+
+[효과:노크]
+그리고 그 소리가, 하나씩 가까워졌다.
+끝 방 문, 그다음 방 문, 그다음.
+누군가 복도의 문을 하나씩 두드리면서 걸어오고 있었다.
+[효과:발소리]
+옆방 문에서, 소리가 멈췄다.
+옆방 남자가, 안에서 작게, 아무도 없습니다, 라고 말하는 게 들렸다.
+그러자 소리가 다시 움직였다.
+
+내 방 앞.
+[효과:노크]
+똑, 똑.
+[효과:심장]
+나는 이불 속에서 숨을 참았다.
+대답하지 않으면 지나갈 거라고 생각했다.
+그런데 문 너머에서, 내 목소리가 들렸다.
+
+남: 아무도 없습니다.
+
+내가 말한 게 아니었다.
+문 밖에서, 내 목소리로, 누가 대신 대답했다.
+그리고 발소리는, 내 방 앞에서 멈춘 채로, 더 이상 움직이지 않았다.
+
+[장면:골목]
+아침이 될 때까지 한숨도 못 잤다.
+여섯 시가 되자마자 짐도 안 챙기고 친구 집으로 갔다.
+그 주 안에 해약했다.
+
+해약하러 부동산에 갔더니, 담당자가 서류를 보며 고개를 갸웃했다.
+남: 손님, 그 방은 지난주에 이미 해약 처리가 되어 있는데요.
+남: 본인이 직접 오셔서, 열쇠도 반납하셨고요.
+
+[효과:정적]
+나는 열쇠를 아직 가지고 있었다.
+지금도 가지고 있다.
+그리고 이상하게, 그 열쇠는 그 맨션 어느 문에도 맞지 않았다.
+딱 하나, 시험해 보지 않은 문이 있긴 하다.
+
+댓글: 하지 마
+댓글: 그럼 지금 그 방에 사는 건 누구야
+
+오늘 이야기는 여기까지입니다.
+여러분 집 복도 끝의 문은, 평면도에 그려져 있나요.`,
+];
+
+// =================== 내장 괴담 작가 : 2ch 괴담 형식 창작 이야기 자동 생성 (조합형) ===================
+const GEN = {
+  intro: ['오늘 들려드릴 이야기는요, 한 익명 게시판에 올라온 글이에요.', '불 끄고 들어 주세요. 오늘은 익명 게시판의 한 스레드 이야기예요.', '자, 오늘 밤 이야기를 시작해 볼게요. 어느 오컬트 게시판에 올라온 글이랍니다.'],
+  outro: ['오늘 이야기는 여기까지예요. 여러분 주변에도, 이런 일이 있지는 않나요.', '오늘 밤 이야기는 여기서 마칠게요. 잘 때는, 문단속 꼭 하세요.', '이야기는 여기까지예요. 혹시 비슷한 일을 겪으셨다면, 댓글로 들려주세요.'],
+  c1: ['벌써 싫다', '장소 대충이라도 알려줘', '이런 거 진짜 좋아함. 계속 써 줘', '그거 진짜 있었던 일이야?', '도입부터 분위기 이상하네'],
+  c2: ['아 거기서 왜 대답을 해', '그건 사람이 아니었던 거 아니냐', '읽다가 뒤 돌아봤다', '규칙 괴담 냄새가 난다', '소름 돋았다'],
+  c3: ['그래서 지금은 괜찮은 거지?', '마지막 줄 뭐냐 진짜', '끝까지 읽은 내가 바보다. 잠 다 잤다', '결국 못 벗어난 거네', '그 뒤 이야기도 있으면 올려 줘'],
+  sets: [
+    { scene: ['편의점', '방', '창문'], sfx: '차임', place: '야간 편의점', titles: ['새벽 세 시의 자동문', '야간 편의점의 마지막 손님', '계산대 너머의 손님'],
+      who: ['대학 다닐 때, 국도변 편의점에서 야간 알바를 반년 정도 했다.', '몇 년 전, 동네 외곽 편의점에서 혼자 밤을 새우는 알바를 했었다.'],
+      start: [['점장이 첫날 종이 한 장을 줬는데, 거기엔 이상한 규칙 하나만 적혀 있었다.', '새벽 세 시에 자동문이 혼자 열리면, 절대 어서 오세요라고 말하지 말 것.'], ['손님은 거의 없었고, 새벽엔 냉장고 돌아가는 소리만 들렸다.', '그런데 매일 새벽 세 시만 되면, 계산대 위 형광등이 한 번씩 깜빡였다.']],
+      odd: [['[효과:차임]', '그날 새벽, 자동문이 열렸다.', '밖에는 아무도 없었다.', '문은 한참을 열려 있다가, 아주 천천히 닫혔다.'], ['감시 카메라 화면에, 진열대 사이에 서 있는 사람이 보였다.', '고개를 들어 가게를 봤는데, 거기엔 아무도 없었다.', '다시 화면을 보니, 그 사람이 카메라를 올려다보고 있었다.']],
+      esc: [['[효과:발소리]', '잡지 코너 쪽에서, 바닥을 끄는 듯한 발소리가 났다.', '나는 계산대 밖으로 나가지 않았다.'], ['[효과:노크]', '창고 쪽 철문을, 누가 안에서 두드렸다.', '창고에는 나 말고 들어갈 사람이 없다.'], ['계산대 위에 동전이 하나 놓여 있었다.', '아까까지 분명히 없던 동전이었다. 축축하게 젖어 있었다.']],
+      climax: [['여: 저기요, 우산 하나만 빌려주세요. 꼭, 돌려드리러 올게요.', '밖은 별이 보일 만큼 맑았다.', '나는 끝까지 안 된다고 했고, 그 사람은 유리문 앞에서, 그냥 사라졌다.'], ['[효과:심장]', '유리창에 비친 가게 안에는, 나 말고 세 사람이 더 서 있었다.', '고개를 돌리면 아무도 없고, 유리를 보면 세 명이었다.', '그중 하나가, 유리 속에서 나에게 손을 흔들었다.']],
+      after: [['다음 날 점장에게 말하니, 점장은 메모장에 날짜만 적고 수고했다고 했다.', '그 주에 알바를 그만뒀다.', '얼마 뒤 지나가 보니, 그 편의점은 공사 가림막에 둘러싸여 있었다.'], ['그날 이후로 그만뒀는데, 가끔 새벽 세 시에 휴대폰이 울린다.', '모르는 번호로, 문자 한 통.', '우산, 돌려드리러 갈게요.']] },
+    { scene: ['복도', '창문', '방'], sfx: '노크', place: '오래된 아파트', titles: ['복도 끝의 노크', '십삼 층의 이웃', '이사 온 첫 주'],
+      who: ['작년에 전근 때문에 오래된 아파트로 이사했다. 시세의 절반이었다.', '혼자 살 집을 구하다가, 역에서 먼 낡은 아파트에 들어갔다.'],
+      start: [['계약할 때 부동산 사람이 한마디를 덧붙였다.', '남: 복도 끝 집 쪽에서 소리가 나도, 대답은 하지 마세요.'], ['복도 끝 집은 비어 있다고 했다.', '그런데 밤마다 그 집 현관 아래 틈으로, 주황색 불빛이 새어 나왔다.']],
+      odd: [['[효과:노크]', '새벽 한 시쯤, 복도에서 노크 소리가 났다.', '내 집이 아니라, 복도 끝 빈집이었다. 안에서.'], ['엘리베이터를 탔는데, 누르지 않은 십삼 층 버튼에 불이 들어왔다.', '이 아파트는 십이 층까지밖에 없다.']],
+      esc: [['[효과:발소리]', '노크 소리가 하나씩 가까워졌다.', '끝 집, 그 옆집, 그 옆집.', '누군가 복도의 문을 하나씩 두드리며 오고 있었다.'], ['옆집 할아버지가 쓰레기를 내놓다가 나를 보고 말했다.', '남: 노크하면, 대답하거든요. 그러니까 절대 먼저 두드리지 마요.'], ['현관 렌즈로 밖을 봤다.', '렌즈 너머가 새까맸다.', '누가 렌즈를 손으로 가리고 있는 것처럼.']],
+      climax: [['[효과:노크]', '내 방 문 앞에서 소리가 멈췄다.', '대답하지 않으면 지나갈 거라고 생각했는데, 문 너머에서 내 목소리가 들렸다.', '남: 아무도 없습니다.'], ['[효과:심장]', '십삼 층에서 문이 열렸다.', '복도에는 우리 층과 똑같은 현관문들이 있었고, 그중 우리 집 호수의 문이 열려 있었다.', '그 안에서, 누가 나를 불렀다. 우리 엄마 목소리로.']],
+      after: [['다음 날 바로 짐을 쌌다.', '해약하러 갔더니, 그 방은 지난주에 이미 내가 해약했다고 되어 있었다.', '열쇠도, 내가 반납했다고.'], ['그 뒤로 엘리베이터를 타지 않는다.', '그런데 요즘 회사 엘리베이터에서도, 가끔 없는 층 버튼에 불이 들어온다.']] },
+    { scene: ['숲', '신사', '골목'], sfx: '종', place: '시골 마을', titles: ['뒷산의 종소리', '돌아보면 안 되는 길', '할머니의 마지막 규칙'],
+      who: ['초등학생 때 여름방학을 외가에서 보냈다. 버스가 하루 두 번 오는 산골 마을이었다.', '어릴 때 매년 여름이면 할머니 댁에 갔다. 산으로 둘러싸인 작은 마을이었다.'],
+      start: [['할머니는 첫날 규칙을 하나 말해 줬다.', '여: 해 지고 산에서 종소리가 나면, 무슨 일이 있어도 뒤를 돌아보면 안 된다.'], ['마을 뒷산 입구의 나무들에는 빨간 끈이 하나씩 묶여 있었다.', '할머니는 그 끈을 넘어가면 안 된다고만 했다.']],
+      odd: [['산 중턱에는 얼굴이 지워진 돌 인형이 있었다.', '사촌 형 말로는, 옛날에 이 산에서 아이가 사라진 뒤로 생긴 거라고 했다.'], ['밤마다 산 쪽에서 누가 이름을 부르는 소리가 났다.', '어른들은 그 소리가 들리면 창문을 닫고, 대답하지 말라고 했다.']],
+      esc: [['[효과:종]', '해가 지는 산길에서, 위쪽에서 종소리가 났다.', '맑은 소리였다. 손으로 작은 종을 흔드는 것처럼.'], ['[효과:발소리]', '뒤에서 누가 따라왔다.', '우리가 빨리 가면 빨리, 천천히 가면 천천히.'], ['손목에 묶어 둔 빨간 끈이, 누가 잡아당기는 것처럼 뒤로 팽팽해졌다.']],
+      climax: [['[효과:종]', '종소리가 바로 뒤에서 났다. 그리고 할머니 목소리로 내 이름을 불렀다.', '여: 얘야, 그쪽 아니다. 이리 와라.', '할머니는 무릎이 아파서, 산 근처에는 오지 않는다.'], ['[효과:심장]', '형이 뛰라고 소리쳤다.', '나는 눈을 감다시피 하고 뛰었고, 손목의 끈이 툭, 끊어졌다.']],
+      after: [['집에 오니 할머니가 말없이 내 등에 소금을 뿌렸다.', '여: 끈이 대신 끊어진 거다. 이번 한 번은 그걸로 됐다.', '다음 날 산 입구 나무에는, 끈이 하나 늘어 있었다.'], ['이십 년 뒤 할머니 장례식 때 그 마을에 다시 갔다.', '산 입구의 빨간 끈은, 내가 기억하는 것보다 훨씬 많았다.']] },
+    { scene: ['터널', '골목', '숲'], sfx: '정적', place: '산길 터널', titles: ['구 터널의 라디오', '돌아오지 않는 터널', '새벽 국도의 히치하이커'],
+      who: ['몇 년 전, 친구 둘이랑 밤에 드라이브를 갔다.', '야간 택배 일을 할 때, 새벽마다 산길 국도를 지났다.'],
+      start: [['내비게이션이 갑자기 옛날 터널 쪽으로 길을 안내했다.', '지금은 안 쓰는, 입구에 철망이 반쯤 쳐진 터널이었다.'], ['그 국도에는 이상한 소문이 있었다.', '새벽에 터널 안에서 라디오가 잡히면, 끝까지 듣지 말고 꺼야 한다고.']],
+      odd: [['[효과:정적]', '터널에 들어서자 라디오가 지직거리더니, 여자 목소리가 나왔다.', '여: 지금 몇 번째 터널을 지나고 계신가요.'], ['터널 조명이 하나씩 꺼졌다. 우리 차가 지나간 순서대로.', '백미러를 보면, 뒤쪽은 이미 완전히 깜깜했다.']],
+      esc: [['한참을 달렸는데, 출구가 나오지 않았다.', '오 분이면 지나는 터널이었다.'], ['[효과:노크]', '창문을 누가 두드렸다.', '시속 육십 킬로로 달리는 중이었다.'], ['뒷자리 친구가 갑자기 조용해졌다.', '돌아보니, 친구는 뒷유리 쪽을 보고 앉아 있었다. 등을 우리 쪽으로 하고.']],
+      climax: [['[효과:정적]', '라디오 목소리가 다시 물었다.', '여: 이제 내리실 건가요.', '그 순간, 앞에 사람이 서 있었다. 터널 한가운데, 우리를 등지고.'], ['[효과:심장]', '친구가 브레이크를 밟았다.', '헤드라이트 앞에 서 있던 사람이 천천히 돌아봤는데, 얼굴이, 뒷머리였다.']],
+      after: [['정신을 차려 보니 우리는 터널 입구 밖에 서 있었다.', '차 블랙박스에는, 터널에 들어가는 장면만 있고 나오는 장면이 없었다.'], ['그 뒤로 그 길은 안 간다.', '그런데 가끔 라디오를 켜면, 주파수 사이에서 그 목소리가 들린다.', '여: 다음 터널에서 기다릴게요.']] },
+    { scene: ['복도', '방', '창문'], sfx: '발소리', place: '밤의 학교', titles: ['야간 경비 일지', '네 번째 계단', '음악실의 피아노'],
+      who: ['대학 휴학 중에, 사립 학교 야간 경비 일을 했다.', '고등학생 때 시험 기간에, 몰래 밤늦게까지 학교에 남은 적이 있다.'],
+      start: [['전임자가 남긴 인수인계 노트 마지막 장에 이렇게 적혀 있었다.', '새벽 두 시 순찰 때, 삼 층 복도 끝 교실은 열어 보지 말 것.'], ['우리 학교에는 계단 괴담이 있었다.', '밤에 중앙 계단을 세면, 열세 칸이 아니라 열네 칸이라고.']],
+      odd: [['[효과:발소리]', '순찰 중에 삼 층 복도에서 발소리가 따라왔다.', '내가 멈추면, 한 걸음 늦게 멈췄다.'], ['음악실에서 피아노 소리가 났다.', '같은 마디만, 계속해서 틀리고 다시 치고 있었다.']],
+      esc: [['복도 끝 교실 문 유리창에, 손바닥 자국이 안쪽에서 찍혀 있었다.', '전부 아이 손 크기였다.'], ['[효과:문]', '닫아 둔 교실 문이, 하나씩 열려 있었다.', '내가 지나온 순서대로.'], ['계단을 세었다. 열둘, 열셋.', '열넷.']],
+      climax: [['[효과:심장]', '삼 층 끝 교실에서, 출석을 부르는 소리가 났다.', '이름이 하나씩 불릴 때마다, 네, 하고 대답하는 아이들 목소리가 들렸다.', '그리고 마지막에, 내 이름이 불렸다.'], ['[효과:정적]', '열네 번째 계단에 발을 올리자, 아래층이 보이지 않았다.', '대신 아까 지나온 삼 층 복도가, 또 있었다.']],
+      after: [['나는 대답하지 않고 경비실로 뛰어 내려왔다.', '아침에 확인해 보니, 그 교실은 이십 년 전부터 창고로 쓰이고 있었다.', '출석부 하나가, 교탁 위에 펼쳐져 있었다.'], ['그 일 이후로 학교를 그만뒀다.', '얼마 전 동창회 단톡방에, 모르는 번호가 사진을 올렸다.', '삼 층 교실 단체 사진이었는데, 맨 뒷줄에 내가 서 있었다.']] },
+    { scene: ['창문', '방', '골목'], sfx: '전화', place: '낡은 여관', titles: ['이백삼 호의 손님', '여관 주인의 부탁', '창밖의 여자'],
+      who: ['혼자 여행을 갔다가, 막차를 놓쳐 바닷가 근처 낡은 여관에 묵었다.', '출장 중에 예약이 꼬여서, 역 앞 오래된 여관에서 하룻밤을 잤다.'],
+      start: [['열쇠를 건네던 주인 할머니가 말했다.', '여: 밤에 창밖에서 누가 불러도, 커튼은 열지 마세요.'], ['방은 이 층 끝 방이었다. 벽에 액자를 떼어 낸 자국이 잔뜩 있었다.', '그리고 방 안의 낡은 전화기는, 선이 끊겨 있었다.']],
+      odd: [['[효과:전화]', '새벽 두 시, 선이 끊긴 전화기가 울렸다.', '받지 않았다. 열 번을 울리고, 멈췄다.'], ['창밖에서 여자 목소리가 들렸다.', '여: 문 좀 열어 줘요. 추워요.', '이 방은 이 층이었다.']],
+      esc: [['[효과:노크]', '이번엔 창문을 두드리는 소리가 났다.', '커튼 아래쪽으로, 젖은 발끝이 보였다. 창문 안쪽에.'], ['복도에서 다른 방 문들이 하나씩 열리고 닫히는 소리가 났다.', '이 여관의 손님은 나 혼자라고 했었다.'], ['커튼에 그림자가 비쳤다.', '사람 모양이었는데, 목이 이상하게 길었다.']],
+      climax: [['[효과:전화]', '전화가 다시 울렸다. 이번엔 받아 버렸다.', '여: 왜 안 열어 줘요. 나 지금, 당신 뒤에 있는데.', '수화기 너머에서도, 내 방 시계 초침 소리가 똑같이 들렸다.'], ['[효과:심장]', '참다못해 커튼 끝을 살짝 들췄다.', '창밖은 바다였다. 그런데 유리에 비친 방 안에는, 내 뒤에 여자가 앉아 있었다.']],
+      after: [['날이 밝자마자 체크아웃을 했다.', '주인 할머니는 내 얼굴을 보더니, 숙박비를 받지 않았다.', '여: 이백삼 호 손님이 또 오셨구먼.'], ['돌아와서 찍은 사진을 정리하다가, 여관 앞에서 찍은 사진을 봤다.', '이 층 끝 방 창문에, 커튼을 걷고 이쪽을 보는 사람이 있었다.', '그 방은, 내가 묵은 방이었다.']] },
+  ],
+};
+function genStory(seed) {
+  let s = (seed || Date.now()) >>> 0; const r = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296, pick = a => a[(r() * a.length) | 0];
+  const st = pick(GEN.sets), title = pick(st.titles), L = [];
+  const push = arr => arr.forEach(x => L.push(x)), cm = (bank, n) => { const b = bank.slice(); for (let i = 0; i < n; i++) L.push('댓글: ' + b.splice((r() * b.length) | 0, 1)[0]); };
+  L.push('# ' + title, `[장면:${st.scene[0]}]`, pick(GEN.intro), `제목은, ${title}.`, '', pick(st.who)); push(pick(st.start)); L.push(''); cm(GEN.c1, 1 + (r() < .5 ? 1 : 0)); L.push('');
+  L.push(`[장면:${st.scene[1]}]`); push(pick(st.odd)); L.push(''); cm(GEN.c2, 1); L.push('');
+  const es = st.esc.slice(); for (let i = 0; i < 3; i++) { push(es.splice((r() * es.length) | 0, 1)[0]); L.push(''); }
+  cm(GEN.c2.filter(x => !L.includes('댓글: ' + x)), 1); L.push('', `[장면:${st.scene[2]}]`, '[쉼:1]'); push(pick(st.climax)); L.push('', '[쉼:1.5]'); push(pick(st.after)); L.push('');
+  cm(GEN.c3, 2); L.push('', pick(GEN.outro));
+  return L.join('\n');
+}
+
+// =================== 내장 AI 목소리 : Supertonic-3 (Supertone · OpenRAIL-M) 를 브라우저에서 실행 ===================
+const ST_ORT = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
+const ST_HF = 'https://huggingface.co/Supertone/supertonic-3/resolve/main/';
+const ST_FILES = [['dp', 'onnx/duration_predictor.onnx', 3.7], ['te', 'onnx/text_encoder.onnx', 36.4], ['ve', 'onnx/vector_estimator.onnx', 256.5], ['voc', 'onnx/vocoder.onnx', 101.4]];
+const ST_WORKER = `
+let ses = {}, cfg = null, idx = null;
+const SYM = { '\\u2013': '-', '\\u2011': '-', '\\u2014': '-', '\\u00af': ' ', '_': ' ', '\\u201c': '"', '\\u201d': '"', '\\u2018': "'", '\\u2019': "'", '\\u00b4': "'", '\`': "'", '[': ' ', ']': ' ', '|': ' ', '/': ' ', '#': ' ', '→': ' ', '←': ' ' };
+function prep(t) { t = t.normalize('NFKD'); t = t.replace(/[\\u{1F300}-\\u{1FAFF}\\u2600-\\u27BF]/gu, ''); for (const k in SYM) t = t.split(k).join(SYM[k]); t = t.replace(/[♥☆♡©\\\\]/g, '');
+  t = t.replace(/ ,/g, ',').replace(/ \\./g, '.').replace(/ !/g, '!').replace(/ \\?/g, '?').replace(/ ;/g, ';').replace(/ :/g, ':').replace(/ '/g, "'").replace(/(["'\`])\\1+/g, '$1').replace(/\\s+/g, ' ').trim();
+  if (!/[.!?;:,'"')\\]}…。」』】〉》›»]$/.test(t)) t += '.'; return '<ko>' + t + '</ko>'; }
+function randn(n) { const a = new Float32Array(n); for (let i = 0; i < n; i += 2) { const u = Math.random() || 1e-9, v = Math.random(), r = Math.sqrt(-2 * Math.log(u)); a[i] = r * Math.cos(6.283185 * v); if (i + 1 < n) a[i + 1] = r * Math.sin(6.283185 * v); } return a; }
+self.onmessage = async e => { const d = e.data;
+  try {
+    if (d.type === 'init') { importScripts('${'${ST_ORT}'}ort.wasm.min.js'); ort.env.wasm.wasmPaths = '${'${ST_ORT}'}'; ort.env.wasm.numThreads = 1; cfg = d.cfg; idx = d.idx;
+      for (const k in d.models) ses[k] = await ort.InferenceSession.create(d.models[k], { executionProviders: ['wasm'], graphOptimizationLevel: 'all' });
+      postMessage({ type: 'ready' }); return; }
+    const T = ort.Tensor, txt = prep(d.text), cps = Array.from(txt), L = cps.length;
+    const ids = new BigInt64Array(L); cps.forEach((c, i) => { const v = idx[c.codePointAt(0)]; ids[i] = BigInt(v == null || v < 0 ? 0 : v); });
+    const tid = new T('int64', ids, [1, L]), tmask = new T('float32', new Float32Array(L).fill(1), [1, 1, L]);
+    const sdp = new T('float32', Float32Array.from(d.style.dp.data.flat(Infinity)), d.style.dp.dims), sttl = new T('float32', Float32Array.from(d.style.ttl.data.flat(Infinity)), d.style.ttl.dims);
+    const o1 = await ses.dp.run({ text_ids: tid, style_dp: sdp, text_mask: tmask }); const dur = o1[ses.dp.outputNames[0]].data[0] / d.speed;
+    const o2 = await ses.te.run({ text_ids: tid, style_ttl: sttl, text_mask: tmask }); const emb = o2[ses.te.outputNames[0]];
+    const sr = cfg.sr, ch = cfg.chunk * cfg.ccf, wavLen = Math.floor(dur * sr), LL = Math.max(1, Math.floor((dur * sr + ch - 1) / ch)), LD = cfg.ldim * cfg.ccf;
+    let xt = new T('float32', randn(LD * LL), [1, LD, LL]); const lmask = new T('float32', new Float32Array(LL).fill(1), [1, 1, LL]), tot = new T('float32', Float32Array.of(d.steps), [1]);
+    for (let s = 0; s < d.steps; s++) { const o = await ses.ve.run({ noisy_latent: xt, text_emb: emb, style_ttl: sttl, text_mask: tmask, latent_mask: lmask, current_step: new T('float32', Float32Array.of(s), [1]), total_step: tot }); xt = o[ses.ve.outputNames[0]]; }
+    const o3 = await ses.voc.run({ latent: xt }); const w = o3[ses.voc.outputNames[0]].data, out = Float32Array.from(w.subarray(0, Math.min(w.length, wavLen)));
+    postMessage({ type: 'done', id: d.id, audio: out, sr }, [out.buffer]);
+  } catch (err) { postMessage({ type: 'err', id: d.id, msg: String(err && err.message || err) }); } };
+`;
+const Voice = {
+  ws: [], q: [], seq: 0, wait: new Map(), styles: {}, initP: null, onStatus: null, sr: 44100,
+  st(h, b) { if (this.onStatus) this.onStatus(h, b); },
+  async fetchCached(path, mb, label) { const url = ST_HF + path; let cache = null;
+    try { cache = await caches.open('goedam-voice-v1'); const hit = await cache.match(url); if (hit) return await hit.arrayBuffer(); } catch (e) { cache = null; }
+    const r = await fetch(url); if (!r.ok) throw new Error('목소리 파일 다운로드 실패 ' + r.status); const total = +r.headers.get('content-length') || mb * 1e6, rd = r.body.getReader(), parts = []; let got = 0, last = -1;
+    for (;;) { const { done, value } = await rd.read(); if (done) break; parts.push(value); got += value.length; const pc = Math.round(got / total * 100); if (pc !== last) { last = pc; this.st(`AI 목소리 받는 중 (처음 한 번, 약 400MB) — ${label} <b>${Math.min(99, pc)}%</b>`, true); } }
+    const u8 = new Uint8Array(got); let o = 0; for (const p of parts) { u8.set(p, o); o += p.length; } try { if (cache) await cache.put(url, new Response(u8.slice(0))); } catch (e) { } return u8.buffer; },
+  async json(path) { return JSON.parse(new TextDecoder().decode(await this.fetchCached(path, .3, path.split('/').pop()))); },
+  init() {
+    if (this.initP) return this.initP;
+    this.initP = (async () => {
+      const cfgJ = await this.json('onnx/tts.json'), idx = await this.json('onnx/unicode_indexer.json');
+      const cfg = { sr: cfgJ.ae.sample_rate, chunk: cfgJ.ae.base_chunk_size, ccf: cfgJ.ttl.chunk_compress_factor, ldim: cfgJ.ttl.latent_dim }; this.sr = cfg.sr;
+      const models = {}; let k = 0; for (const [key, p, mb] of ST_FILES) models[key] = await this.fetchCached(p, mb, `${++k}/4`);
+      this.st('AI 목소리 켜는 중…', true);
+      const hc = navigator.hardwareConcurrency || 4, mem = navigator.deviceMemory || 8, K = Math.max(1, Math.min(4, Math.floor(hc / 2), mem >= 8 ? 4 : 1));
+      const url = URL.createObjectURL(new Blob([ST_WORKER.replace(/\$\{ST_ORT\}/g, ST_ORT)], { type: 'text/javascript' }));
+      this.ws = await Promise.all(Array.from({ length: K }, () => new Promise((res, rej) => { const w = new Worker(url);
+        w.onmessage = e => { if (e.data.type === 'ready') { w.onmessage = ev => this.onW(w, ev.data); w.busy = false; res(w); } else rej(new Error(e.data.msg)); };
+        w.onerror = e => rej(new Error(e.message || '워커 오류')); const m = {}; for (const key in models) m[key] = models[key].slice(0); w.postMessage({ type: 'init', models: m, cfg, idx }); })));
+      return true; })();
+    this.initP.catch(() => { this.initP = null; }); return this.initP;
+  },
+  onW(w, d) { w.busy = false; const p = this.wait.get(d.id); if (p) { this.wait.delete(d.id); d.type === 'err' ? p.rej(new Error(d.msg)) : p.res(d.audio); } this.pump(); },
+  pump() { for (const w of this.ws) { if (w.busy || !this.q.length) continue; const j = this.q.shift(); w.busy = true; w.postMessage(j); } },
+  async style(name) { if (!this.styles[name]) { const j = await this.json('voice_styles/' + name + '.json'); this.styles[name] = { ttl: j.style_ttl, dp: j.style_dp }; } return this.styles[name]; },
+  async say(text, voice = 'F2', speed = .9, steps = 8) { await this.init(); const style = await this.style(voice);
+    return new Promise((res, rej) => { const id = ++this.seq; this.wait.set(id, { res, rej }); this.q.push({ id, text, style, speed, steps }); this.pump(); }); },
+};
+
+// =================== 괴담 스튜디오 : 이야기 → AI 목소리 → 영상 (전부 이 브라우저 안에서) ===================
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const VOICES = [['F2', '여 · 동화구연 (추천)', 'f'], ['F1', '여 · 차분', 'f'], ['F3', '여 · 낮은 톤', 'f'], ['F4', '여 · 맑음', 'f'], ['F5', '여 · 부드러움', 'f'], ['M1', '남 · 기본', 'm'], ['M2', '남 · 차분', 'm'], ['M3', '남 · 낮은 톤', 'm'], ['M4', '남 · 밝음', 'm'], ['M5', '남 · 부드러움', 'm']];
+const S = Object.assign({ main: 'F2', sub: 'F4', male: 'M1', speed: .85, bgm: .2, reverb: .18, channel: '', res: 1080, fps: 30, scenes: SCENE_IDS.join(','), voiceCredit: 'AI 음성(Supertonic) — 이 영상의 목소리는 AI가 생성했습니다', vbr: 4e6 },
+  (() => { try { return JSON.parse(localStorage.getItem('goedam-studio') || '{}'); } catch (e) { return {}; } })());
+const saveS = () => { try { localStorage.setItem('goedam-studio', JSON.stringify(S)); } catch (e) { } };
+const INTRO = 4.2, OUTRO = 5.5, SR = 48000;
+let AC = null; const ac = () => { if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SR }); if (AC.state === 'suspended') AC.resume(); return AC; };
+const msg = (h, busy) => { const el = $('#msg'); el.innerHTML = h; el.classList.toggle('busy', !!busy); };
+// ---------- 원고 해석 ----------
+function splitSentences(text) {
+  let parts = text.match(/[^.?!…。]+[.?!…。]*["'”’)]*\s*/g) || [text]; parts = parts.map(s => s.trim()).filter(Boolean);
+  const out = []; for (const p of parts) { if (out.length && p.length < 6) out[out.length - 1] += ' ' + p; else out.push(p); }
+  const fin = []; for (const s of out) { if (s.length <= 70) { fin.push(s); continue; } let cur = ''; for (const seg of s.split(/(?<=,)\s*/)) { if ((cur + seg).length > 70 && cur) { fin.push(cur.trim()); cur = ''; } cur += seg + ' '; } if (cur.trim()) fin.push(cur.trim()); }
+  return fin;
+}
+function parse(src) {
+  let title = '제목 없음'; const items = [];
+  for (const raw of src.split(/\r?\n/)) { const L = raw.trim(); let m;
+    if (!L) { if (items.length && items[items.length - 1].k !== 'gap') items.push({ k: 'gap', sec: 1 }); continue; }
+    if (/^#/.test(L)) { title = L.replace(/^#+\s*/, ''); continue; }
+    if ((m = L.match(/^\[장면\s*:\s*(.+?)\]$/))) { items.push({ k: 'scene', id: m[1].trim() }); continue; }
+    if ((m = L.match(/^\[효과\s*:\s*(.+?)\]$/))) { items.push({ k: 'sfx', id: m[1].trim() }); continue; }
+    if ((m = L.match(/^\[쉼\s*:\s*([\d.]+)\]$/))) { items.push({ k: 'gap', sec: +m[1] }); continue; }
+    let who = 'main', text = L; if ((m = L.match(/^(댓글|남|여)\s*:\s*(.*)$/))) { who = m[1]; text = m[2]; }
+    for (const sen of splitSentences(text)) items.push({ k: 'say', who, text: sen });
+  }
+  return { title, items };
+}
+function voiceFor(who) { return who === '댓글' ? S.sub : who === '남' ? S.male : S.main; }
+// ---------- 목소리 (Supertonic, 이 브라우저에서 합성 · 결과는 저장해 두고 재사용) ----------
+const IDB = { db: null, async open() { if (this.db !== null) return this.db; this.db = await new Promise(res => { try { const r = indexedDB.open('goedam-tts', 1); r.onupgradeneeded = () => r.result.createObjectStore('a'); r.onsuccess = () => res(r.result); r.onerror = () => res(false); } catch (e) { res(false); } }); return this.db; },
+  async get(k) { const db = await this.open(); if (!db) return null; return new Promise(res => { try { const q = db.transaction('a').objectStore('a').get(k); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); } catch (e) { res(null); } }); },
+  async put(k, v) { const db = await this.open(); if (!db) return; try { db.transaction('a', 'readwrite').objectStore('a').put(v, k); } catch (e) { } } };
+const TTS = { mem: new Map(),
+  async get(text, voice) { const tx = text.trim(), sp = Math.max(.7, Math.min(1.2, S.speed * (tx.length < 12 || /(\.\.\.|…)$/.test(tx) ? .93 : tx.length > 45 ? 1.03 : 1))); const k = [voice, sp, text].join('|'); if (this.mem.has(k)) return this.mem.get(k);
+    const p = (async () => { let a = await IDB.get(k); if (!a) { a = await Voice.say(text, voice, sp, 12); const nz = a.findIndex(v => Math.abs(v) > .01); let e = a.length - 1; while (e > 0 && Math.abs(a[e]) < .01) e--; a = a.slice(Math.max(0, nz - 600), Math.min(a.length, e + 2200)); IDB.put(k, a); }
+      const b = ac().createBuffer(1, a.length, Voice.sr); b.copyToChannel(a, 0); return b; })();
+    this.mem.set(k, p); p.catch(() => this.mem.delete(k)); return p; } };
+// ---------- 타임라인 ----------
+let PROJ = null; // { title, clips, scenes, sfx, total, mix, sceneObjs }
+async function buildProject(src) {
+  const P = parse(src), says = P.items.filter(x => x.k === 'say'); if (!says.length) throw new Error('읽을 문장이 없습니다.');
+  let done = 0; const bufs = new Array(says.length); const q = says.map((x, i) => i); const K = 8;
+  await Promise.all(Array.from({ length: K }, async () => { while (q.length) { const i = q.shift(); bufs[i] = await TTS.get(says[i].text, voiceFor(says[i].who)); done++; msg(`AI 목소리로 읽는 중… <b>${done}/${says.length}</b> 문장 (처음 읽는 문장만 시간이 걸려요)`, true); $('#bar i').style.width = (done / says.length * 100) + '%'; } }));
+  const clips = [], scenes = [], sfx = [], breaths = []; let t = INTO(), si = 0, lastScene = -99, rot = 0; const pool = S.scenes.split(',').filter(x => SCENES[x]); if (!pool.length) pool.push(...SCENE_IDS);
+  const nextAuto = () => pool[(rot++) % pool.length];
+  scenes.push({ t: 0, id: P.items.find(x => x.k === 'scene') ? P.items.find(x => x.k === 'scene').id : nextAuto() }); lastScene = 0;
+  for (const it of P.items) {
+    if (it.k === 'scene') { if (SCENES[it.id]) { const L = scenes[scenes.length - 1]; if (L.id === it.id) { } else if (t - L.t < 2) L.id = it.id; else scenes.push({ t, id: it.id }); lastScene = t; } continue; }
+    if (it.k === 'sfx') { sfx.push({ t, id: it.id }); t += it.id === '정적' ? 1.1 : it.id === '노크' || it.id === '심장' || it.id === '발소리' ? .9 : .5; continue; }
+    if (it.k === 'gap') { t += it.sec; continue; }
+    if (t - lastScene > 32) { let id = nextAuto(); if (id === scenes[scenes.length - 1].id) id = nextAuto(); scenes.push({ t: t - .4, id }); lastScene = t; }
+    const b = bufs[si++], tx = it.text.trim(), prevGap = clips.length ? t - (clips[clips.length - 1].t + clips[clips.length - 1].dur) : 9;
+    if (prevGap > .8 || (clips.length && clips[clips.length - 1].who !== it.who)) breaths.push(Math.max(0, t - .42));
+    clips.push({ t, dur: b.duration, buf: b, text: it.text, who: it.who });
+    t += b.duration + (/(\.\.\.|…)$/.test(tx) ? .85 : /[?!]$/.test(tx) ? .6 : /,$/.test(tx) ? .3 : it.who !== 'main' ? .55 : .48) + (Math.random() - .5) * .08;
+  }
+  const total = t + OUTRO;
+  return { title: P.title, clips, scenes, sfx, total, breaths };
+}
+function INTO() { return INTRO; }
+// ---------- 효과음 · 배경음 (절차 생성) ----------
+function noiseBuf(ctx, sec = 2) { const n = ctx.sampleRate * sec, b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1; return b; }
+function sfx(ctx, out, id, t) {
+  const N = noiseBuf(ctx, 3);
+  const burst = (at, f, q, dur, g, type = 'bandpass') => { const s = ctx.createBufferSource(); s.buffer = N; const fl = ctx.createBiquadFilter(); fl.type = type; fl.frequency.value = f; fl.Q.value = q; const a = ctx.createGain(); a.gain.setValueAtTime(0, at); a.gain.linearRampToValueAtTime(g, at + .004); a.gain.exponentialRampToValueAtTime(.0005, at + dur); s.connect(fl).connect(a).connect(out); s.start(at, Math.random()); s.stop(at + dur + .05); };
+  const tone = (at, f0, f1, dur, g, type = 'sine') => { const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, at); o.frequency.exponentialRampToValueAtTime(f1, at + dur); const a = ctx.createGain(); a.gain.setValueAtTime(0, at); a.gain.linearRampToValueAtTime(g, at + .01); a.gain.exponentialRampToValueAtTime(.0005, at + dur); o.connect(a).connect(out); o.start(at); o.stop(at + dur + .05); };
+  switch (id) {
+    case '노크': for (let i = 0; i < 3; i++) { const a = t + i * .3; burst(a, 900, 1.2, .12, .5); tone(a, 140, 80, .14, .6); } break;
+    case '발소리': for (let i = 0; i < 4; i++) { const a = t + i * .52; burst(a, 300, .8, .16, .35, 'lowpass'); burst(a + .03, 2500, 1.5, .05, .05); } break;
+    case '심장': for (let i = 0; i < 3; i++) { const a = t + i * .9; tone(a, 70, 40, .16, .9); tone(a + .2, 62, 36, .18, .7); } break;
+    case '바람': { const s = ctx.createBufferSource(); s.buffer = N; s.loop = true; const fl = ctx.createBiquadFilter(); fl.type = 'bandpass'; fl.Q.value = 2; fl.frequency.setValueAtTime(300, t); fl.frequency.linearRampToValueAtTime(900, t + 1.5); fl.frequency.linearRampToValueAtTime(350, t + 3.2);
+      const a = ctx.createGain(); a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(.35, t + 1.2); a.gain.linearRampToValueAtTime(0, t + 3.4); s.connect(fl).connect(a).connect(out); s.start(t); s.stop(t + 3.5); break; }
+    case '종': for (const [k, g, d] of [[1, .25, 3.5], [2.76, .12, 2.2], [5.4, .07, 1.4], [8.9, .03, .8]]) tone(t, 980 * k, 980 * k * .998, d, g); break;
+    case '전화': for (let r = 0; r < 2; r++) { const a = t + r * 1.6; for (const f of [440, 480]) { const o = ctx.createOscillator(); o.frequency.value = f; const g = ctx.createGain(); g.gain.setValueAtTime(0, a); g.gain.linearRampToValueAtTime(.08, a + .02); g.gain.setValueAtTime(.08, a + .9); g.gain.linearRampToValueAtTime(0, a + .95); o.connect(g).connect(out); o.start(a); o.stop(a + 1); } } break;
+    case '정적': burst(t, 3000, .3, 1.1, .3, 'highpass'); break;
+    case '문': { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(70, t); o.frequency.linearRampToValueAtTime(140, t + .6); o.frequency.linearRampToValueAtTime(90, t + 1.3); const fl = ctx.createBiquadFilter(); fl.type = 'bandpass'; fl.frequency.value = 1100; fl.Q.value = 6;
+      const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 18; lg.gain.value = 600; lfo.connect(lg).connect(fl.frequency); const a = ctx.createGain(); a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(.2, t + .1); a.gain.linearRampToValueAtTime(0, t + 1.35); o.connect(fl).connect(a).connect(out); o.start(t); o.stop(t + 1.4); lfo.start(t); lfo.stop(t + 1.4); break; }
+    case '차임': [1319, 1047, 1175, 784].forEach((f, i) => tone(t + i * .32, f, f, 1.1, .12)); break;
+  }
+}
+function bgm(ctx, out, total) { // 어두운 드론 + 바람 + 가끔 유리 울림
+  const g = ctx.createGain(); g.connect(out); g.gain.value = 1;
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260; lp.Q.value = .7; lp.connect(g);
+  for (const [f, d, v] of [[55, -7, .1], [55, 6, .1], [82.4, 3, .06], [110.6, -4, .03]]) { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = d; const a = ctx.createGain(); a.gain.value = v; o.connect(a).connect(lp); o.start(0); o.stop(total); }
+  const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = .05; lg.gain.value = 120; lfo.connect(lg).connect(lp.frequency); lfo.start(0); lfo.stop(total);
+  const N = noiseBuf(ctx, 4), ns = ctx.createBufferSource(); ns.buffer = N; ns.loop = true; const nf = ctx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 500; nf.Q.value = .8; const na = ctx.createGain(); na.gain.value = .05;
+  const l2 = ctx.createOscillator(), l2g = ctx.createGain(); l2.frequency.value = .07; l2g.gain.value = 300; l2.connect(l2g).connect(nf.frequency); l2.start(0); l2.stop(total); ns.connect(nf).connect(na).connect(g); ns.start(0); ns.stop(total);
+  let rr = 3; for (let t = 9; t < total - 4; t += 14 + (rr = (rr * 7 + 3) % 11)) { const f = [1568, 1760, 2093, 1397][rr % 4]; const o = ctx.createOscillator(); o.frequency.value = f; const a = ctx.createGain(); a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(.02, t + .05); a.gain.exponentialRampToValueAtTime(.0003, t + 4); o.connect(a).connect(g); o.start(t); o.stop(t + 4.1); }
+  return g;
+}
+function reverbIR(ctx, sec = 2.6) { const n = ctx.sampleRate * sec, b = ctx.createBuffer(2, n, ctx.sampleRate); for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3); } return b; }
+async function mixAudio(P) {
+  const oc = new OfflineAudioContext(2, Math.ceil(P.total * SR), SR), master = oc.createGain(); master.gain.value = .95;
+  const comp = oc.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 3; master.connect(comp).connect(oc.destination);
+  const voice = oc.createGain(); voice.gain.value = 1.15; const rv = oc.createConvolver(); rv.buffer = reverbIR(oc, 1.6); const rg = oc.createGain(); rg.gain.value = S.reverb * .8;
+  // 사람 목소리처럼: 저역 정리 → 따뜻함(200Hz) → 또렷함(3kHz) → 치찰음 완화(7.5kHz) → 부드러운 압축
+  const hp = oc.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 75;
+  const warm = oc.createBiquadFilter(); warm.type = 'lowshelf'; warm.frequency.value = 220; warm.gain.value = 2.5;
+  const pres = oc.createBiquadFilter(); pres.type = 'peaking'; pres.frequency.value = 3000; pres.Q.value = .9; pres.gain.value = 1.8;
+  const ess = oc.createBiquadFilter(); ess.type = 'peaking'; ess.frequency.value = 7500; ess.Q.value = 2; ess.gain.value = -3;
+  const vc = oc.createDynamicsCompressor(); vc.threshold.value = -22; vc.ratio.value = 2.5; vc.attack.value = .008; vc.release.value = .2; vc.knee.value = 8;
+  hp.connect(warm).connect(pres).connect(ess).connect(vc).connect(voice); voice.connect(master); voice.connect(rv).connect(rg).connect(master);
+  const er = oc.createDelay(); er.delayTime.value = .018; const erg = oc.createGain(); erg.gain.value = .12; vc.connect(er).connect(erg).connect(master); // 가까운 벽 반사
+  for (const c of P.clips) { const d = c.buf.getChannelData(0); let e = 0; for (let i = 0; i < d.length; i += 4) e += d[i] * d[i]; const rms = Math.sqrt(e / (d.length / 4)) || .05;
+    const g = oc.createGain(); g.gain.value = Math.min(3, .085 / rms) * (c.who === '댓글' ? .92 : 1); const s = oc.createBufferSource(); s.buffer = c.buf; s.connect(g).connect(hp); s.start(c.t); }
+  // 숨 들이쉬는 소리 (문단 시작·화자 바뀔 때)
+  const NB = noiseBuf(oc, 1); for (const t of (P.breaths || [])) { const s = oc.createBufferSource(); s.buffer = NB; const bp = oc.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.setValueAtTime(900, t); bp.frequency.linearRampToValueAtTime(1500, t + .32); bp.Q.value = .8;
+    const lp = oc.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3200; const a = oc.createGain(); a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(.022, t + .2); a.gain.linearRampToValueAtTime(0, t + .36); s.connect(bp).connect(lp).connect(a).connect(voice); s.start(t, Math.random() * .5); s.stop(t + .4); }
+  const bg = bgm(oc, master, P.total), duck = bg.gain; duck.setValueAtTime(S.bgm, 0);
+  for (const c of P.clips) { duck.setTargetAtTime(S.bgm * .62, Math.max(0, c.t - .2), .15); duck.setTargetAtTime(S.bgm, c.t + c.dur + .1, .5); }
+  duck.setTargetAtTime(0, P.total - 2, .6);
+  const fx = oc.createGain(); fx.gain.value = .9; fx.connect(master); fx.connect(rv); for (const e of P.sfx) sfx(oc, fx, e.id, e.t);
+  return await oc.startRendering();
+}
+// ---------- 프레임 그리기 ----------
+const SCN = {}; let userImgs = [];
+function sceneObj(id, i) { const k = id + ':' + i; if (!SCN[k]) { const ui = id.startsWith('img') ? userImgs[+id.slice(3)] : null; SCN[k] = makeScene(ui ? id : id, 11 + i * 7 + id.length, ui); } return SCN[k]; }
+function wrap(o, text, maxW) { const out = []; let line = ''; for (const w of text.split(' ')) { const t = line ? line + ' ' + w : w; if (o.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t; }
+  if (line) out.push(line); const fin = []; for (const l of out) { if (o.measureText(l).width <= maxW) { fin.push(l); continue; } let cur = ''; for (const ch of l) { if (o.measureText(cur + ch).width > maxW) { fin.push(cur); cur = ''; } cur += ch; } fin.push(cur); } return fin; }
+function drawFrame(o, P, t) {
+  o.setTransform(1, 0, 0, 1, 0, 0); o.fillStyle = '#000'; o.fillRect(0, 0, SW, SH);
+  let k = 0; while (k < P.scenes.length - 1 && t >= P.scenes[k + 1].t) k++;
+  const cur = P.scenes[k], nxt = P.scenes[k + 1], end = nxt ? nxt.t : P.total, u = Math.min(1, (t - cur.t) / Math.max(1, end - cur.t)), sc = sceneObj(cur.id, k);
+  const into = t - cur.t, XF = 1.4;
+  if (k > 0 && into < XF) { const pv = P.scenes[k - 1], ps = sceneObj(pv.id, k - 1); drawScene(o, ps, t, 1, 1, k - 1); drawScene(o, sc, t, u, Math.min(1, into / XF), k); }
+  else drawScene(o, sc, t, u, 1, k);
+  let glitch = k > 0 && into < .22 && k % 2 ? (.22 - into) * 3 : 0;
+  for (const e of P.sfx) if (e.id === '정적' && t >= e.t && t < e.t + .9) glitch = Math.max(glitch, .55 * (1 - (t - e.t) / .9));
+  drawFX(o, t, glitch);
+  // 채널 표시
+  if (S.channel) { o.font = '600 26px "Noto Sans KR",sans-serif'; o.fillStyle = 'rgba(230,225,215,.45)'; o.textAlign = 'left'; o.textBaseline = 'top'; o.fillText(S.channel, 48, 38); }
+  // 제목 카드
+  if (t < INTRO) { const a = Math.min(1, t / .8, (INTRO - t) / .7), fl = Math.random() < .04 ? .4 : 1; o.fillStyle = `rgba(0,0,0,${.55 * a})`; o.fillRect(0, 0, SW, SH);
+    o.textAlign = 'center'; o.textBaseline = 'middle'; o.globalAlpha = a * fl; o.font = '800 96px "Nanum Myeongjo",serif'; o.fillStyle = '#e9e4da'; o.shadowColor = '#000'; o.shadowBlur = 30; o.fillText(P.title, SW / 2, SH / 2 - 10);
+    o.font = '400 30px "Nanum Myeongjo",serif'; o.fillStyle = 'rgba(210,200,190,.8)'; o.fillText('2ch 괴담 · 창작 낭독', SW / 2, SH / 2 + 80); o.shadowBlur = 0; o.globalAlpha = 1; }
+  // 끝 카드
+  if (t > P.total - OUTRO + .5) { const a = Math.min(1, (t - (P.total - OUTRO + .5)) / 1.2); o.fillStyle = `rgba(0,0,0,${.7 * a})`; o.fillRect(0, 0, SW, SH); o.globalAlpha = a; o.textAlign = 'center'; o.textBaseline = 'middle';
+    o.font = '700 64px "Nanum Myeongjo",serif'; o.fillStyle = '#e9e4da'; o.fillText(S.channel || '오늘 밤의 괴담', SW / 2, SH / 2 - 30); o.font = '400 30px "Noto Sans KR",sans-serif'; o.fillStyle = 'rgba(210,200,190,.8)'; o.fillText('다음 이야기에서 또 만나요 · 구독과 좋아요는 큰 힘이 됩니다', SW / 2, SH / 2 + 50); o.globalAlpha = 1; }
+  // 자막
+  const c = P.clips.find(c => t >= c.t - .05 && t < c.t + c.dur + .25);
+  if (c) { const isC = c.who === '댓글', a = Math.min(1, (t - c.t + .05) / .18, (c.t + c.dur + .25 - t) / .2);
+    o.font = `${isC ? 600 : 700} ${isC ? 46 : 52}px ${isC ? '"Noto Sans KR",sans-serif' : '"Nanum Myeongjo",serif'}`; o.textAlign = 'center'; o.textBaseline = 'alphabetic';
+    const lines = wrap(o, (isC ? '＞ ' : '') + c.text, SW * .78), lh = isC ? 62 : 70, y0 = SH - 96 - (lines.length - 1) * lh;
+    o.globalAlpha = a; o.lineJoin = 'round';
+    lines.forEach((l, i) => { o.lineWidth = 9; o.strokeStyle = 'rgba(0,0,0,.85)'; o.strokeText(l, SW / 2, y0 + i * lh); o.fillStyle = isC ? '#b8c7cf' : c.who === '여' ? '#efd9d9' : '#f1ede4'; o.fillText(l, SW / 2, y0 + i * lh); });
+    o.globalAlpha = 1; }
+}
+// ---------- 미리보기 ----------
+const PV = { src: null, t0: 0, off: 0, playing: false, raf: 0 };
+const pvCtx = () => $('#cv').getContext('2d');
+function pvTime() { return PV.playing ? ac().currentTime - PV.t0 : PV.off; }
+function pvDraw() { if (!PROJ) return; const t = Math.min(PROJ.total, pvTime()); drawFrame(pvCtx(), PROJ, t); $('#seek').value = t / PROJ.total * 1000; $('#tcode').textContent = fmt(t) + ' / ' + fmt(PROJ.total); if (PV.playing && t >= PROJ.total) pvStop(); }
+function pvLoop() { pvDraw(); if (PV.playing) PV.raf = requestAnimationFrame(pvLoop); }
+function pvPlay() { if (!PROJ || !PROJ.mix) return; const ctx = ac(); pvStop(true); const s = ctx.createBufferSource(); s.buffer = PROJ.mix; s.connect(ctx.destination); PV.t0 = ctx.currentTime + .05 - PV.off; s.start(ctx.currentTime + .05, PV.off); PV.src = s; PV.playing = true; $('#bPlay').textContent = '❚❚ 일시정지'; pvLoop(); }
+function pvStop(keep) { if (PV.src) { try { PV.src.stop(); } catch (e) { } PV.src = null; } if (PV.playing) PV.off = Math.min(PROJ ? PROJ.total : 0, pvTime()); PV.playing = false; cancelAnimationFrame(PV.raf); $('#bPlay').textContent = '▶ 미리보기'; if (!keep) pvDraw(); }
+const fmt = s => { s = Math.max(0, s); const m = Math.floor(s / 60), x = Math.floor(s % 60); return `${m}:${String(x).padStart(2, '0')}`; };
+// ---------- 저장 : MP4 (WebCodecs) ----------
+let CANCEL = false;
+async function pickCodecs(w, h) {
+  if (!window.VideoEncoder || !window.AudioEncoder || !window.Mp4Muxer) return null;
+  let v = null; for (const [mux, codec] of [['avc', 'avc1.640028'], ['avc', 'avc1.4d0028'], ['avc', 'avc1.42e028'], ['vp9', 'vp09.00.40.08']]) {
+    const cfg = { codec, width: w, height: h, bitrate: S.vbr || (w > 1300 ? 8e6 : 5e6), framerate: S.fps, latencyMode: 'quality' }; try { if ((await VideoEncoder.isConfigSupported(cfg)).supported) { v = { mux, cfg }; break; } } catch (e) { } }
+  let a = null; for (const [mux, codec] of [['aac', 'mp4a.40.2'], ['opus', 'opus']]) { const cfg = { codec, sampleRate: SR, numberOfChannels: 2, bitrate: 192000 }; try { if ((await AudioEncoder.isConfigSupported(cfg)).supported) { a = { mux, cfg }; break; } } catch (e) { } }
+  return v && a ? { v, a } : null;
+}
+async function exportMP4() {
+  if (!PROJ || !PROJ.mix) return; pvStop(true); CANCEL = false;
+  const W = S.res == 720 ? 1280 : 1920, H = S.res == 720 ? 720 : 1080, cs = await pickCodecs(W, H);
+  if (!cs) return exportWebM();
+  const name = fileBase() + '.mp4'; let target, stream = null;
+  if (window.showSaveFilePicker) { try { const fh = await showSaveFilePicker({ suggestedName: name, types: [{ description: 'MP4 영상', accept: { 'video/mp4': ['.mp4'] } }] }); stream = await fh.createWritable(); target = new Mp4Muxer.FileSystemWritableFileStreamTarget(stream); } catch (e) { if (e.name === 'AbortError') { msg('저장을 취소했습니다.'); return; } } }
+  if (!target) target = new Mp4Muxer.ArrayBufferTarget();
+  const mux = new Mp4Muxer.Muxer({ target, video: { codec: cs.v.mux, width: W, height: H, frameRate: S.fps }, audio: { codec: cs.a.mux, numberOfChannels: 2, sampleRate: SR }, fastStart: stream ? false : 'in-memory', firstTimestampBehavior: 'offset' });
+  let err = null; const ve = new VideoEncoder({ output: (c, m) => mux.addVideoChunk(c, m), error: e => err = e }); ve.configure(cs.v.cfg);
+  const ae = new AudioEncoder({ output: (c, m) => mux.addAudioChunk(c, m), error: e => err = e }); ae.configure(cs.a.cfg);
+  const mixB = PROJ.mix, L = mixB.getChannelData(0), R = mixB.getChannelData(1), FR = 1024 * 4;
+  for (let i = 0; i < mixB.length; i += FR) { const n = Math.min(FR, mixB.length - i), d = new Float32Array(n * 2); d.set(L.subarray(i, i + n), 0); d.set(R.subarray(i, i + n), n);
+    const ad = new AudioData({ format: 'f32-planar', sampleRate: SR, numberOfFrames: n, numberOfChannels: 2, timestamp: Math.round(i / SR * 1e6), data: d }); ae.encode(ad); ad.close(); }
+  await ae.flush();
+  const cv = document.createElement('canvas'); cv.width = SW; cv.height = SH; const o = cv.getContext('2d');
+  let out = cv; if (W !== SW) { out = document.createElement('canvas'); out.width = W; out.height = H; }
+  const oo = out === cv ? null : out.getContext('2d'), nF = Math.ceil(PROJ.total * S.fps), t0 = performance.now();
+  for (let f = 0; f < nF; f++) {
+    if (CANCEL || err) break; drawFrame(o, PROJ, f / S.fps); if (oo) oo.drawImage(cv, 0, 0, W, H);
+    const vf = new VideoFrame(out, { timestamp: Math.round(f * 1e6 / S.fps), duration: Math.round(1e6 / S.fps) }); ve.encode(vf, { keyFrame: f % (S.fps * 2) === 0 }); vf.close();
+    while (ve.encodeQueueSize > 6) await new Promise(r => setTimeout(r, 2));
+    if (f % 15 === 0) { const el = (performance.now() - t0) / 1000, eta = el / (f + 1) * (nF - f - 1); $('#bar i').style.width = (f / nF * 100).toFixed(1) + '%'; msg(`MP4 만드는 중… <b>${Math.round(f / nF * 100)}%</b> · 남은 시간 약 ${fmt(eta)} <button class="btn sm" onclick="CANCEL=true">취소</button>`, true); await new Promise(r => setTimeout(r, 0)); }
+  }
+  await ve.flush(); ve.close(); ae.close();
+  if (CANCEL || err) { if (stream) try { await stream.close(); } catch (e) { } msg(err ? '영상 만들기 실패: ' + esc(err.message || err) : '취소했습니다.'); $('#bar i').style.width = '0'; return; }
+  mux.finalize(); if (stream) await stream.close(); else download(new Blob([target.buffer], { type: 'video/mp4' }), name);
+  $('#bar i').style.width = '100%'; msg(`<b>저장 완료</b> — ${esc(name)} (${fmt(PROJ.total)}, ${H}p, ${cs.v.mux.toUpperCase()}/${cs.a.mux.toUpperCase()}). 유튜브에 그대로 올리면 됩니다.`);
+}
+async function exportWebM() { // WebCodecs가 없을 때: 실시간 녹화
+  const cv = $('#cv'), st = cv.captureStream(S.fps), ctx = ac(), dest = ctx.createMediaStreamDestination(); st.addTrack(dest.stream.getAudioTracks()[0]);
+  const rec = new MediaRecorder(st, { mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' : 'video/webm', videoBitsPerSecond: 8e6 }), parts = [];
+  rec.ondataavailable = e => e.data.size && parts.push(e.data); const s = ctx.createBufferSource(); s.buffer = PROJ.mix; s.connect(dest); s.connect(ctx.destination);
+  const t0 = ctx.currentTime + .1; s.start(t0); rec.start(1000); CANCEL = false;
+  await new Promise(res => { const step = () => { const t = ctx.currentTime - t0; drawFrame(cv.getContext('2d'), PROJ, Math.max(0, t)); msg(`이 브라우저는 빠른 저장을 지원하지 않아 <b>실시간 녹화</b> 중… ${fmt(t)} / ${fmt(PROJ.total)} <button class="btn sm" onclick="CANCEL=true">취소</button>`, true); if (t >= PROJ.total || CANCEL) res(); else requestAnimationFrame(step); }; step(); });
+  s.stop(); rec.stop(); await new Promise(r => rec.onstop = r); if (!CANCEL) { download(new Blob(parts, { type: 'video/webm' }), fileBase() + '.webm'); msg('<b>저장 완료</b> (.webm) — 유튜브에 그대로 올릴 수 있습니다.'); } else msg('취소했습니다.');
+}
+// ---------- 기타 저장 ----------
+function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
+const fileBase = () => (PROJ ? PROJ.title : 'story').replace(/[\\/:*?"<>|]/g, '_');
+function srt() { const ts = s => { const ms = Math.round(s * 1000), h = ms / 3600000 | 0, m = ms / 60000 % 60 | 0, x = ms / 1000 % 60 | 0; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')},${String(ms % 1000).padStart(3, '0')}`; };
+  return PROJ.clips.map((c, i) => `${i + 1}\n${ts(c.t)} --> ${ts(c.t + c.dur + .2)}\n${c.who === '댓글' ? '> ' : ''}${c.text}\n`).join('\n'); }
+function ytText() {
+  const P = PROJ, chap = []; let last = -99; P.scenes.forEach((s, i) => { if (s.t - last > 60 || i === 0) { chap.push(`${fmt(i === 0 ? 0 : s.t)} ${i === 0 ? '시작' : '이야기 ' + (chap.length)}`); last = s.t; } });
+  return `[제목]\n[2ch 괴담] ${P.title} | 잠들기 전 듣는 잔잔한 괴담 낭독\n\n[설명]\n${P.title}\n\n일본 익명 게시판 2ch 괴담 형식으로 만든 창작 이야기를 잔잔하게 읽어 드립니다.\n불 끄고, 이어폰 끼고 들어 보세요.\n\n${chap.join('\n')}\n\n※ 이 이야기는 2ch 괴담 형식으로 창작한 픽션입니다. 실제 인물·장소와 관계없습니다.\n※ 낭독: ${S.voiceCredit} · 화면·효과음: 자체 제작\n\n#괴담 #2ch괴담 #무서운이야기 #괴담낭독 #공포 #수면괴담\n\n[태그]\n괴담, 2ch 괴담, 일본 괴담, 무서운 이야기, 공포 낭독, 괴담 낭독, 수면 괴담, 미스터리, 오컬트, ${P.title}`;
+}
+async function thumb() {
+  await fontsFor((PROJ ? PROJ.title : parse($('#script').value).title) + S.channel); const cv = document.createElement('canvas'); cv.width = SW; cv.height = SH; const o = cv.getContext('2d'), P = PROJ || { scenes: [{ t: 0, id: SCENE_IDS[0] }], sfx: [], clips: [], total: 60, title: parse($('#script').value).title };
+  const sc = sceneObj(P.scenes[Math.min(1, P.scenes.length - 1)].id, 99); drawScene(o, sc, 3, .4, 1, 0); drawFX(o, 3, 0);
+  const g = o.createLinearGradient(0, 0, SW * .7, 0); g.addColorStop(0, 'rgba(0,0,0,.85)'); g.addColorStop(1, 'rgba(0,0,0,0)'); o.fillStyle = g; o.fillRect(0, 0, SW, SH);
+  o.textAlign = 'left'; o.textBaseline = 'alphabetic'; o.font = '900 70px "Noto Sans KR",sans-serif'; o.fillStyle = '#c4161c'; o.fillText('2ch 괴담', 90, 230);
+  o.font = '800 150px "Nanum Myeongjo",serif'; const lines = wrap(o, P.title, SW * .62); o.lineJoin = 'round';
+  lines.slice(0, 3).forEach((l, i) => { const y = 420 + i * 170; o.lineWidth = 16; o.strokeStyle = '#000'; o.strokeText(l, 90, y); o.fillStyle = '#f2ede2'; o.fillText(l, 90, y); });
+  if (S.channel) { o.font = '700 46px "Noto Sans KR",sans-serif'; o.fillStyle = 'rgba(240,235,225,.8)'; o.fillText(S.channel, 90, SH - 90); }
+  const t = document.createElement('canvas'); t.width = 1280; t.height = 720; t.getContext('2d').drawImage(cv, 0, 0, 1280, 720); t.toBlob(b => download(b, fileBase() + '_썸네일.png'), 'image/png');
+}
+// 한글 웹폰트는 글자 묶음별로 나뉘어 있어서, 쓸 글자를 미리 불러와야 캔버스에 제대로 그려짐
+async function fontsFor(text) { const t = text + '0123456789:/· 2ch괴담창작낭독다음이야기에서또만나요구독과좋아요는큰힘이됩니다오늘밤의'; const specs = ['700 52px "Nanum Myeongjo"', '800 96px "Nanum Myeongjo"', '400 30px "Nanum Myeongjo"', '600 46px "Noto Sans KR"', '400 30px "Noto Sans KR"', '700 46px "Noto Sans KR"', '900 70px "Noto Sans KR"', '600 26px "Noto Sans KR"'];
+  try { await Promise.race([Promise.all(specs.map(f => document.fonts.load(f, t))), new Promise(r => setTimeout(r, 8000))]); } catch (e) { } }
+
+// ---------- 화면 ----------
+function scriptInfo() { const P = parse($('#script').value), says = P.items.filter(x => x.k === 'say'), chars = says.reduce((a, x) => a + x.text.length, 0);
+  $('#sInfo').innerHTML = `<b>${esc(P.title)}</b> · 문장 ${says.length}개 · 예상 길이 약 <b>${fmt(chars / 6.2 + says.length * .3 + INTRO + OUTRO)}</b>`; try { localStorage.setItem('goedam-script', $('#script').value); } catch (e) { } }
+function setScript(t) { $('#script').value = t; scriptInfo(); PROJ = null; $('#after').hidden = true; }
+async function make() {
+  pvStop(true); $('#bMake').disabled = $('#bAuto').disabled = true; $('#after').hidden = true;
+  try { PROJ = await buildProject($('#script').value); await fontsFor(PROJ.title + PROJ.clips.map(c => c.text).join('') + S.channel);
+    msg('배경음·효과음 섞는 중…', true); PROJ.mix = await mixAudio(PROJ); PV.off = 0; $('#bar i').style.width = '100%';
+    $('#after').hidden = false; pvDraw(); msg(`<b>완성!</b> ${fmt(PROJ.total)} 길이 — ▶ 미리보기로 확인하고 <b>MP4 저장</b>을 누르세요.`); return true; }
+  catch (e) { msg('만들 수 없습니다: ' + esc(e.message || e) + (/fetch|download|다운로드/i.test(String(e.message)) ? ' — 인터넷 연결을 확인하세요 (처음 한 번 목소리 파일을 받아야 합니다).' : '')); return false; }
+  finally { $('#bMake').disabled = $('#bAuto').disabled = false; }
+}
+(function init() {
+  const vopt = sel => VOICES.map(v => `<option value="${v[0]}" ${v[0] === sel ? 'selected' : ''}>${v[1]}</option>`).join('');
+  $('#vMain').innerHTML = vopt(S.main); $('#vSub').innerHTML = vopt(S.sub); $('#vMale').innerHTML = vopt(S.male);
+  $('#speed').value = S.speed; $('#speedV').textContent = S.speed.toFixed(2) + '배'; $('#chan').value = S.channel; $('#bgmV').value = S.bgm; $('#res').value = S.res;
+  $('#base').innerHTML = '<option value="">기본 이야기 고르기</option>' + STORIES.map((s, i) => `<option value="${i}">${esc(parse(s).title)}</option>`).join('');
+  let sv = null; try { sv = localStorage.getItem('goedam-script'); } catch (e) { } $('#script').value = sv || genStory(); scriptInfo();
+  Voice.onStatus = (h, b) => msg(h, b);
+  $('#script').addEventListener('input', scriptInfo);
+  $('#bGen').addEventListener('click', () => { setScript(genStory()); msg('새 괴담을 썼습니다. 마음에 안 들면 한 번 더 누르거나 직접 고쳐도 됩니다.'); });
+  $('#base').addEventListener('change', e => { if (e.target.value !== '') setScript(STORIES[+e.target.value]); e.target.value = ''; });
+  $('#vMain').addEventListener('change', e => { S.main = e.target.value; saveS(); }); $('#vSub').addEventListener('change', e => { S.sub = e.target.value; saveS(); }); $('#vMale').addEventListener('change', e => { S.male = e.target.value; saveS(); });
+  $('#speed').addEventListener('input', e => { S.speed = +e.target.value; $('#speedV').textContent = S.speed.toFixed(2) + '배'; saveS(); });
+  $('#chan').addEventListener('input', e => { S.channel = e.target.value; saveS(); }); $('#bgmV').addEventListener('input', e => { S.bgm = +e.target.value; saveS(); }); $('#res').addEventListener('change', e => { S.res = +e.target.value; saveS(); });
+  $('#imgIn').addEventListener('change', async e => { for (const f of e.target.files) { const im = new Image(); im.src = URL.createObjectURL(f); await im.decode().catch(() => { }); const i = userImgs.length; userImgs.push(im); SCENES['img' + i] = () => () => { }; S.scenes += ',img' + i; } msg(`사진 ${e.target.files.length}장을 장면에 넣었습니다 (어둡게 보정해서 씀).`); });
+  $('#bTry').addEventListener('click', async () => { try { const b = await TTS.get('옛날 옛날, 불 꺼진 복도 끝에서, 누군가 문을 두드리고 있었어요.', S.main); const s = ac().createBufferSource(); s.buffer = b; s.connect(ac().destination); s.start(); msg('들리시나요? 목소리와 빠르기를 바꿔 가며 골라 보세요.'); } catch (e) { msg('실패: ' + esc(e.message || e)); } });
+  $('#bMake').addEventListener('click', make);
+  $('#bAuto').addEventListener('click', async () => { setScript(genStory()); if (await make()) { msg('MP4 저장 중…', true); await exportMP4(); } });
+  $('#bPlay').addEventListener('click', () => PV.playing ? pvStop() : pvPlay());
+  $('#seek').addEventListener('input', e => { if (!PROJ) return; const was = PV.playing; pvStop(true); PV.off = e.target.value / 1000 * PROJ.total; pvDraw(); if (was) pvPlay(); });
+  $('#bMP4').addEventListener('click', exportMP4); $('#bThumb').addEventListener('click', thumb);
+  $('#bSrt').addEventListener('click', () => download(new Blob([srt()], { type: 'text/plain;charset=utf-8' }), fileBase() + '.srt'));
+  $('#bYt').addEventListener('click', () => { const t = ytText(); $('#ytOut').value = t; $('#ytOut').hidden = false; navigator.clipboard && navigator.clipboard.writeText(t).then(() => msg('유튜브 제목·설명·태그를 복사했습니다.'), () => { }); });
+  texInit(); const o = pvCtx(); drawScene(o, sceneObj(SCENE_IDS[0], 0), 2, .2, 1, 0); drawFX(o, 2, 0); o.textAlign = 'center'; o.textBaseline = 'middle'; o.font = '700 70px "Nanum Myeongjo",serif'; o.fillStyle = '#e9e4da'; o.fillText('괴담 스튜디오', SW / 2, SH / 2);
+  if (!window.VideoEncoder) $('#codecNote').textContent = '※ 이 브라우저는 빠른 MP4 저장을 지원하지 않아 실시간 녹화(.webm)로 저장됩니다. 크롬·엣지를 권장합니다.';
+})();
+
+</script>
+</body>
+</html>
