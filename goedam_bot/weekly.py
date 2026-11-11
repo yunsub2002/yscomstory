@@ -21,6 +21,15 @@ def sh(*cmd, cwd=None, check=True, out=False):
     return r.stdout.strip() if out else r
 
 
+def push_safe(root, br):
+    """제작 중에 저장소가 바뀌었어도(업데이트 등) 최신 상태를 받아 합친 뒤 올림"""
+    for i in range(5):
+        if subprocess.run(['git', 'push', 'origin', f'HEAD:{br}'], cwd=root).returncode == 0: return
+        print(f'  ! 저장소가 그새 바뀌어서 최신 내용과 합칩니다 ({i + 1}/5)', flush=True)
+        sh('git', 'pull', '--rebase', '--autostash', '-X', 'theirs', 'origin', br, cwd=root, check=False)
+    raise RuntimeError('git push 실패')
+
+
 def pages_dir():
     """Pages 가 어디서 나가는지(브랜치·폴더) 확인해서 goedam/ 을 그 아래에 둠"""
     try:
@@ -99,7 +108,7 @@ def main():
         used.append(h)
     (gd / 'videos.json').write_text(json.dumps(db, ensure_ascii=False, indent=1), encoding='utf-8')
     (gd / 'used.json').write_text(json.dumps(used[-500:]), encoding='utf-8'); render_page(gd, db)
-    sh('git', 'add', gd, cwd=root); sh('git', 'commit', '-m', f'괴담 영상 {len(made)}편 추가 ({stamp:%Y-%m-%d})', cwd=root); sh('git', 'push', 'origin', f'HEAD:{br}', cwd=root)
+    sh('git', 'add', gd, cwd=root); sh('git', 'commit', '-m', f'괴담 영상 {len(made)}편 추가 ({stamp:%Y-%m-%d})', cwd=root); push_safe(root, br)
     user, rn = REPO.split('/'); print(f'\n완료 → https://{user}.github.io/{rn}/goedam/')
 
 
