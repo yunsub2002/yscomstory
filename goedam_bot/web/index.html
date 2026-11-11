@@ -704,7 +704,7 @@ async function buildProject(src) {
   if (S.engine === 'azure' && (!S.key.trim() || !S.region.trim())) throw new Error('Azure 키와 지역을 먼저 넣어 주세요 (설정 ①). 키 없이 흐름만 보려면 음성 엔진을 "테스트"로.');
   let done = 0; const bufs = new Array(says.length); const q = says.map((x, i) => i); const K = S.engine === 'test' ? 8 : 3;
   await Promise.all(Array.from({ length: K }, async () => { while (q.length) { const i = q.shift(); bufs[i] = await TTS.get(says[i].text, voiceFor(says[i].who)); done++; msg(`음성 만드는 중… <b>${done}/${says.length}</b> 문장`, true); } }));
-  const clips = [], scenes = [], sfx = []; let t = INTO(), si = 0, lastScene = -99, rot = 0; const pool = S.scenes.split(',').filter(x => SCENES[x]); if (!pool.length) pool.push(...SCENE_IDS);
+  const clips = [], scenes = [], sfx = [], breaths = []; let t = INTO(), si = 0, lastScene = -99, rot = 0; const pool = S.scenes.split(',').filter(x => SCENES[x]); if (!pool.length) pool.push(...SCENE_IDS);
   const nextAuto = () => pool[(rot++) % pool.length];
   scenes.push({ t: 0, id: P.items.find(x => x.k === 'scene') ? P.items.find(x => x.k === 'scene').id : nextAuto() }); lastScene = 0;
   for (const it of P.items) {
@@ -712,10 +712,13 @@ async function buildProject(src) {
     if (it.k === 'sfx') { sfx.push({ t, id: it.id }); t += it.id === '정적' ? 1.1 : it.id === '노크' || it.id === '심장' || it.id === '발소리' ? .9 : .5; continue; }
     if (it.k === 'gap') { t += it.sec; continue; }
     if (t - lastScene > 32) { let id = nextAuto(); if (id === scenes[scenes.length - 1].id) id = nextAuto(); scenes.push({ t: t - .4, id }); lastScene = t; }
-    const b = bufs[si++]; clips.push({ t, dur: b.duration, buf: b, text: it.text, who: it.who }); t += b.duration + .45;
+    const b = bufs[si++], tx = it.text.trim(), prevGap = clips.length ? t - (clips[clips.length - 1].t + clips[clips.length - 1].dur) : 9;
+    if (prevGap > .8 || (clips.length && clips[clips.length - 1].who !== it.who)) breaths.push(Math.max(0, t - .42));
+    clips.push({ t, dur: b.duration, buf: b, text: it.text, who: it.who });
+    t += b.duration + (/(\.\.\.|…)$/.test(tx) ? .85 : /[?!]$/.test(tx) ? .6 : /,$/.test(tx) ? .3 : it.who !== 'main' ? .55 : .48) + (Math.random() - .5) * .08;
   }
   const total = t + OUTRO;
-  return { title: P.title, clips, scenes, sfx, total };
+  return { title: P.title, clips, scenes, sfx, total, breaths };
 }
 function INTO() { return INTRO; }
 // ---------- 효과음 · 배경음 (절차 생성) ----------
@@ -752,9 +755,20 @@ function reverbIR(ctx, sec = 2.6) { const n = ctx.sampleRate * sec, b = ctx.crea
 async function mixAudio(P) {
   const oc = new OfflineAudioContext(2, Math.ceil(P.total * SR), SR), master = oc.createGain(); master.gain.value = .95;
   const comp = oc.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 3; master.connect(comp).connect(oc.destination);
-  const voice = oc.createGain(); voice.gain.value = 1.1; voice.connect(master); const rv = oc.createConvolver(); rv.buffer = reverbIR(oc); const rg = oc.createGain(); rg.gain.value = S.reverb; voice.connect(rv).connect(rg).connect(master);
-  const hp = oc.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 70; hp.connect(voice);
-  for (const c of P.clips) { const s = oc.createBufferSource(); s.buffer = c.buf; s.connect(hp); s.start(c.t); }
+  const voice = oc.createGain(); voice.gain.value = 1.15; const rv = oc.createConvolver(); rv.buffer = reverbIR(oc, 1.6); const rg = oc.createGain(); rg.gain.value = S.reverb * .8;
+  // 사람 목소리처럼: 저역 정리 → 따뜻함(200Hz) → 또렷함(3kHz) → 치찰음 완화(7.5kHz) → 부드러운 압축
+  const hp = oc.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 75;
+  const warm = oc.createBiquadFilter(); warm.type = 'lowshelf'; warm.frequency.value = 220; warm.gain.value = 2.5;
+  const pres = oc.createBiquadFilter(); pres.type = 'peaking'; pres.frequency.value = 3000; pres.Q.value = .9; pres.gain.value = 1.8;
+  const ess = oc.createBiquadFilter(); ess.type = 'peaking'; ess.frequency.value = 7500; ess.Q.value = 2; ess.gain.value = -3;
+  const vc = oc.createDynamicsCompressor(); vc.threshold.value = -22; vc.ratio.value = 2.5; vc.attack.value = .008; vc.release.value = .2; vc.knee.value = 8;
+  hp.connect(warm).connect(pres).connect(ess).connect(vc).connect(voice); voice.connect(master); voice.connect(rv).connect(rg).connect(master);
+  const er = oc.createDelay(); er.delayTime.value = .018; const erg = oc.createGain(); erg.gain.value = .12; vc.connect(er).connect(erg).connect(master); // 가까운 벽 반사
+  for (const c of P.clips) { const d = c.buf.getChannelData(0); let e = 0; for (let i = 0; i < d.length; i += 4) e += d[i] * d[i]; const rms = Math.sqrt(e / (d.length / 4)) || .05;
+    const g = oc.createGain(); g.gain.value = Math.min(3, .085 / rms) * (c.who === '댓글' ? .92 : 1); const s = oc.createBufferSource(); s.buffer = c.buf; s.connect(g).connect(hp); s.start(c.t); }
+  // 숨 들이쉬는 소리 (문단 시작·화자 바뀔 때)
+  const NB = noiseBuf(oc, 1); for (const t of (P.breaths || [])) { const s = oc.createBufferSource(); s.buffer = NB; const bp = oc.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.setValueAtTime(900, t); bp.frequency.linearRampToValueAtTime(1500, t + .32); bp.Q.value = .8;
+    const lp = oc.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3200; const a = oc.createGain(); a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(.022, t + .2); a.gain.linearRampToValueAtTime(0, t + .36); s.connect(bp).connect(lp).connect(a).connect(voice); s.start(t, Math.random() * .5); s.stop(t + .4); }
   const bg = bgm(oc, master, P.total), duck = bg.gain; duck.setValueAtTime(S.bgm, 0);
   for (const c of P.clips) { duck.setTargetAtTime(S.bgm * .62, Math.max(0, c.t - .2), .15); duck.setTargetAtTime(S.bgm, c.t + c.dur + .1, .5); }
   duck.setTargetAtTime(0, P.total - 2, .6);

@@ -48,10 +48,14 @@ def synth(items, cache):
     cache.mkdir(parents=True, exist_ok=True); table = {}
     for i, (who, s) in enumerate(items):
         v, sp = VOICE.get(who, VOICE['main'])
+        # 짧은 문장·말줄임·마지막 반전 문장은 천천히, 긴 설명 문장은 살짝 빠르게 (사람이 읽는 리듬)
+        if len(s) < 12 or s.endswith(('...', '…')): sp *= .93
+        elif len(s) > 45: sp *= 1.03
+        sp = round(max(.7, min(1.2, sp)), 3)
         key = hashlib.md5(f'{v}|{sp}|{s}'.encode()).hexdigest()[:16]; f = cache / f'{key}.wav'
         if not f.exists():
             if v not in styles: styles[v] = tts.get_voice_style(v)
-            wav, _ = tts.synthesize(s, voice_style=styles[v], lang='ko', speed=sp)
+            wav, _ = tts.synthesize(s, voice_style=styles[v], lang='ko', speed=sp, total_steps=12)
             w = np.asarray(wav, dtype='float32').squeeze()
             # 앞뒤 무음 정리 + 끝 살짝 페이드
             nz = np.where(np.abs(w) > .01)[0]
