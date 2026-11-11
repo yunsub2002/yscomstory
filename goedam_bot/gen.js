@@ -54,8 +54,8 @@ function genStory(seed) {
   let s = (seed || Date.now()) >>> 0; const r = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296, pick = a => a[(r() * a.length) | 0];
   const st = pick(GEN.sets), title = pick(st.titles), L = [];
   const push = arr => arr.forEach(x => L.push(x)), cm = (bank, n) => { const b = bank.slice(); for (let i = 0; i < n; i++) L.push('댓글: ' + b.splice((r() * b.length) | 0, 1)[0]); };
-  L.push('# ' + title, `[장면:${st.scene[0]}]`, pick(GEN.intro), `제목은, ${title}.`, '', pick(st.who)); push(pick(st.start)); L.push(''); cm(GEN.c1, 1 + (r() < .5 ? 1 : 0)); L.push('');
-  L.push(`[장면:${st.scene[1]}]`); push(pick(st.odd)); L.push(''); cm(GEN.c2, 1); L.push('');
+  L.push('# ' + title, `[장면:${st.scene[0]}]`, pick(GEN.intro), `제목은, ${title}.`, '', pick(st.who)); push(st.start[0]); L.push(''); push(st.start[1]); L.push(''); cm(GEN.c1, 2); L.push('');
+  L.push(`[장면:${st.scene[1]}]`); const od = r() < .5 ? [0, 1] : [1, 0]; push(st.odd[od[0]]); L.push(''); cm(GEN.c2, 1); L.push('', '[쉼:1]'); push(st.odd[od[1]]); L.push(''); cm(GEN.c1.filter(x => !L.includes('댓글: ' + x)), 1); L.push('');
   const es = st.esc.slice(); for (let i = 0; i < 3; i++) { push(es.splice((r() * es.length) | 0, 1)[0]); L.push(''); }
   cm(GEN.c2.filter(x => !L.includes('댓글: ' + x)), 1); L.push('', `[장면:${st.scene[2]}]`, '[쉼:1]'); push(pick(st.climax)); L.push('', '[쉼:1.5]'); push(pick(st.after)); L.push('');
   cm(GEN.c3, 2); L.push('', pick(GEN.outro));

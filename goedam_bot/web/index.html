@@ -78,7 +78,7 @@ kbd{font:12px ui-monospace,monospace;background:#0b0c0e;border:1px solid var(--l
       <div id="bar"><i></i></div>
       <div id="msg">원고를 고르고 <b>음성·영상 만들기</b>를 누르세요. 키가 없으면 ①에서 <b>테스트</b>로 흐름만 볼 수 있습니다.</div>
       <div id="after" class="col" hidden style="gap:10px">
-        <div class="row"><button class="btn pri" id="bMP4" type="button">⇩ MP4로 저장</button><button class="btn" id="bThumb" type="button">⇩ 썸네일 PNG</button><button class="btn" id="bSrt" type="button">⇩ 자막 SRT</button><button class="btn" id="bWav" type="button">⇩ 소리만 WAV</button><button class="btn" id="bYt" type="button">📋 유튜브 제목·설명·태그</button></div>
+        <div class="row"><button class="btn pri" id="bMP4" type="button">⇩ MP4로 저장</button><button class="btn pri" id="bShort" type="button">⇩ 숏츠(세로)</button><button class="btn" id="bThumb" type="button">⇩ 썸네일 PNG</button><button class="btn" id="bSrt" type="button">⇩ 자막 SRT</button><button class="btn" id="bWav" type="button">⇩ 소리만 WAV</button><button class="btn" id="bYt" type="button">📋 유튜브 제목·설명·태그</button></div>
         <p class="note" id="codecNote">MP4 저장은 영상 길이보다 빠르게 만들어집니다 (크롬·엣지). 저장 위치를 고르는 창이 뜨면 이 폴더의 <b>영상</b> 폴더를 고르세요.</p>
         <textarea id="ytOut" hidden aria-label="유튜브 설명문"></textarea>
       </div>
@@ -780,7 +780,7 @@ const SCN = {}; let userImgs = [];
 function sceneObj(id, i) { const k = id + ':' + i; if (!SCN[k]) { const ui = id.startsWith('img') ? userImgs[+id.slice(3)] : null; SCN[k] = makeScene(ui ? id : id, 11 + i * 7 + id.length, ui); } return SCN[k]; }
 function wrap(o, text, maxW) { const out = []; let line = ''; for (const w of text.split(' ')) { const t = line ? line + ' ' + w : w; if (o.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t; }
   if (line) out.push(line); const fin = []; for (const l of out) { if (o.measureText(l).width <= maxW) { fin.push(l); continue; } let cur = ''; for (const ch of l) { if (o.measureText(cur + ch).width > maxW) { fin.push(cur); cur = ''; } cur += ch; } fin.push(cur); } return fin; }
-function drawFrame(o, P, t) {
+function drawFrame(o, P, t, opt = {}) {
   o.setTransform(1, 0, 0, 1, 0, 0); o.fillStyle = '#000'; o.fillRect(0, 0, SW, SH);
   let k = 0; while (k < P.scenes.length - 1 && t >= P.scenes[k + 1].t) k++;
   const cur = P.scenes[k], nxt = P.scenes[k + 1], end = nxt ? nxt.t : P.total, u = Math.min(1, (t - cur.t) / Math.max(1, end - cur.t)), sc = sceneObj(cur.id, k);
@@ -790,6 +790,7 @@ function drawFrame(o, P, t) {
   let glitch = k > 0 && into < .22 && k % 2 ? (.22 - into) * 3 : 0;
   for (const e of P.sfx) if (e.id === '정적' && t >= e.t && t < e.t + .9) glitch = Math.max(glitch, .55 * (1 - (t - e.t) / .9));
   drawFX(o, t, glitch);
+  if (opt.noText) return;
   // 채널 표시
   if (S.channel) { o.font = '600 26px "Noto Sans KR",sans-serif'; o.fillStyle = 'rgba(230,225,215,.45)'; o.textAlign = 'left'; o.textBaseline = 'top'; o.fillText(S.channel, 48, 38); }
   // 제목 카드
@@ -807,6 +808,25 @@ function drawFrame(o, P, t) {
     o.globalAlpha = a; o.lineJoin = 'round';
     lines.forEach((l, i) => { o.lineWidth = 9; o.strokeStyle = 'rgba(0,0,0,.85)'; o.strokeText(l, SW / 2, y0 + i * lh); o.fillStyle = isC ? '#b8c7cf' : c.who === '여' ? '#efd9d9' : '#f1ede4'; o.fillText(l, SW / 2, y0 + i * lh); });
     o.globalAlpha = 1; }
+}
+
+// ---------- 숏츠(세로 9:16) 화면 ----------
+function drawShort(o, src, P, t) {
+  const W = 1080, H = 1920; o.setTransform(1, 0, 0, 1, 0, 0); o.globalAlpha = 1; o.fillStyle = '#000'; o.fillRect(0, 0, W, H);
+  const cw = SH * W / H, pan = (Math.sin(t * .05) * .5 + .5) * (SW - cw); o.drawImage(src, pan, 0, cw, SH, 0, 0, W, H);
+  const g = o.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(0,0,0,.78)'); g.addColorStop(.26, 'rgba(0,0,0,.12)'); g.addColorStop(.55, 'rgba(0,0,0,.12)'); g.addColorStop(1, 'rgba(0,0,0,.82)'); o.fillStyle = g; o.fillRect(0, 0, W, H);
+  o.textAlign = 'center'; o.textBaseline = 'alphabetic'; o.lineJoin = 'round';
+  o.font = '900 46px "Noto Sans KR",sans-serif'; o.fillStyle = '#e0302a'; o.fillText('2ch 괴담', W / 2, 250);
+  o.font = '800 80px "Nanum Myeongjo",serif'; wrap(o, P.title, W * .86).slice(0, 2).forEach((l, i) => { const y = 352 + i * 94; o.lineWidth = 12; o.strokeStyle = '#000'; o.strokeText(l, W / 2, y); o.fillStyle = '#f2ede2'; o.fillText(l, W / 2, y); });
+  if (t < INTRO) { const a = Math.max(0, Math.min(1, t / .3, (INTRO - t) / .5)); o.globalAlpha = a; o.font = '900 66px "Noto Sans KR",sans-serif';
+    wrap(o, '끝까지 들으면 소름 돋는 이야기', W * .84).forEach((l, i) => { const y = H * .52 + i * 84; o.lineWidth = 12; o.strokeStyle = '#000'; o.strokeText(l, W / 2, y); o.fillStyle = '#fff'; o.fillText(l, W / 2, y); }); o.globalAlpha = 1; }
+  const c = P.clips.find(c => t >= c.t - .05 && t < c.t + c.dur + .25);
+  if (c) { const isC = c.who === '댓글'; o.font = `${isC ? 700 : 800} ${isC ? 58 : 68}px ${isC ? '"Noto Sans KR",sans-serif' : '"Nanum Myeongjo",serif'}`;
+    const lines = wrap(o, (isC ? '＞ ' : '') + c.text, W * .86), lh = isC ? 76 : 88, y0 = H * .64 - (lines.length - 1) * lh / 2;
+    lines.forEach((l, i) => { o.lineWidth = 13; o.strokeStyle = 'rgba(0,0,0,.92)'; o.strokeText(l, W / 2, y0 + i * lh); o.fillStyle = isC ? '#b8c7cf' : '#f6f1e6'; o.fillText(l, W / 2, y0 + i * lh); }); }
+  if (t > P.total - OUTRO + .5) { const a = Math.min(1, (t - (P.total - OUTRO + .5)) / 1); o.globalAlpha = a; o.fillStyle = 'rgba(0,0,0,.6)'; o.fillRect(0, 0, W, H);
+    o.font = '900 70px "Noto Sans KR",sans-serif'; o.fillStyle = '#fff'; o.fillText('구독하고', W / 2, H * .45); o.fillText('다음 괴담 듣기', W / 2, H * .45 + 90); o.globalAlpha = 1; }
+  o.fillStyle = 'rgba(255,255,255,.18)'; o.fillRect(60, H - 160, W - 120, 8); o.fillStyle = '#e0302a'; o.fillRect(60, H - 160, (W - 120) * Math.min(1, t / P.total), 8);
 }
 // ---------- 미리보기 ----------
 const PV = { src: null, t0: 0, off: 0, playing: false, raf: 0 };
@@ -826,11 +846,12 @@ async function pickCodecs(w, h) {
   let a = null; for (const [mux, codec] of [['aac', 'mp4a.40.2'], ['opus', 'opus']]) { const cfg = { codec, sampleRate: SR, numberOfChannels: 2, bitrate: 192000 }; try { if ((await AudioEncoder.isConfigSupported(cfg)).supported) { a = { mux, cfg }; break; } } catch (e) { } }
   return v && a ? { v, a } : null;
 }
-async function exportMP4() {
-  if (!PROJ || !PROJ.mix) return; pvStop(true); CANCEL = false;
-  const W = S.res == 720 ? 1280 : 1920, H = S.res == 720 ? 720 : 1080, cs = await pickCodecs(W, H);
+async function exportMP4(opt = {}) {
+  if (!PROJ || !PROJ.mix) return; pvStop(true); CANCEL = false; const SHORT = !!(opt && opt.short);
+  if (SHORT && PROJ.total > 180) { msg(`숏츠는 3분 이하만 됩니다 (이 영상 ${fmt(PROJ.total)}). 원고를 조금 줄이거나 빠르기를 올려 주세요.`); return; }
+  const W = SHORT ? 1080 : S.res == 720 ? 1280 : 1920, H = SHORT ? 1920 : S.res == 720 ? 720 : 1080, cs = await pickCodecs(W, H);
   if (!cs) return exportWebM();
-  const name = fileBase() + '.mp4'; let target, stream = null;
+  const name = fileBase() + (SHORT ? '_숏츠' : '') + '.mp4'; let target, stream = null;
   if (window.showSaveFilePicker) { try { const fh = await showSaveFilePicker({ suggestedName: name, types: [{ description: 'MP4 영상', accept: { 'video/mp4': ['.mp4'] } }] }); stream = await fh.createWritable(); target = new Mp4Muxer.FileSystemWritableFileStreamTarget(stream); } catch (e) { if (e.name === 'AbortError') { msg('저장을 취소했습니다.'); return; } } }
   if (!target) target = new Mp4Muxer.ArrayBufferTarget();
   const mux = new Mp4Muxer.Muxer({ target, video: { codec: cs.v.mux, width: W, height: H, frameRate: S.fps }, audio: { codec: cs.a.mux, numberOfChannels: 2, sampleRate: SR }, fastStart: stream ? false : 'in-memory', firstTimestampBehavior: 'offset' });
@@ -844,15 +865,15 @@ async function exportMP4() {
   let out = cv; if (W !== SW) { out = document.createElement('canvas'); out.width = W; out.height = H; }
   const oo = out === cv ? null : out.getContext('2d'), nF = Math.ceil(PROJ.total * S.fps), t0 = performance.now();
   for (let f = 0; f < nF; f++) {
-    if (CANCEL || err) break; drawFrame(o, PROJ, f / S.fps); if (oo) oo.drawImage(cv, 0, 0, W, H);
+    if (CANCEL || err) break; drawFrame(o, PROJ, f / S.fps, { noText: SHORT }); if (SHORT) drawShort(oo, cv, PROJ, f / S.fps); else if (oo) oo.drawImage(cv, 0, 0, W, H);
     const vf = new VideoFrame(out, { timestamp: Math.round(f * 1e6 / S.fps), duration: Math.round(1e6 / S.fps) }); ve.encode(vf, { keyFrame: f % (S.fps * 2) === 0 }); vf.close();
     while (ve.encodeQueueSize > 6) await new Promise(r => setTimeout(r, 2));
-    if (f % 15 === 0) { const el = (performance.now() - t0) / 1000, eta = el / (f + 1) * (nF - f - 1); $('#bar i').style.width = (f / nF * 100).toFixed(1) + '%'; msg(`MP4 만드는 중… <b>${Math.round(f / nF * 100)}%</b> · 남은 시간 약 ${fmt(eta)} <button class="btn sm" onclick="CANCEL=true">취소</button>`, true); await new Promise(r => setTimeout(r, 0)); }
+    if (f % 15 === 0) { const el = (performance.now() - t0) / 1000, eta = el / (f + 1) * (nF - f - 1); $('#bar i').style.width = (f / nF * 100).toFixed(1) + '%'; msg(`${SHORT ? '숏츠 ' : ''}MP4 만드는 중… <b>${Math.round(f / nF * 100)}%</b> · 남은 시간 약 ${fmt(eta)} <button class="btn sm" onclick="CANCEL=true">취소</button>`, true); await new Promise(r => setTimeout(r, 0)); }
   }
   await ve.flush(); ve.close(); ae.close();
   if (CANCEL || err) { if (stream) try { await stream.close(); } catch (e) { } msg(err ? '영상 만들기 실패: ' + esc(err.message || err) : '취소했습니다.'); $('#bar i').style.width = '0'; return; }
   mux.finalize(); if (stream) await stream.close(); else download(new Blob([target.buffer], { type: 'video/mp4' }), name);
-  $('#bar i').style.width = '100%'; msg(`<b>저장 완료</b> — ${esc(name)} (${fmt(PROJ.total)}, ${H}p, ${cs.v.mux.toUpperCase()}/${cs.a.mux.toUpperCase()}). 유튜브에 그대로 올리면 됩니다.`);
+  $('#bar i').style.width = '100%'; msg(`<b>저장 완료</b> — ${esc(name)} (${fmt(PROJ.total)}, ${SHORT ? '세로 숏츠 1080×1920' : H + 'p'}, ${cs.v.mux.toUpperCase()}/${cs.a.mux.toUpperCase()}). 유튜브에 그대로 올리면 됩니다.`);
 }
 async function exportWebM() { // WebCodecs가 없을 때: 실시간 녹화
   const cv = $('#cv'), st = cv.captureStream(S.fps), ctx = ac(), dest = ctx.createMediaStreamDestination(); st.addTrack(dest.stream.getAudioTracks()[0]);
@@ -882,7 +903,7 @@ async function thumb() {
   const t = document.createElement('canvas'); t.width = 1280; t.height = 720; t.getContext('2d').drawImage(cv, 0, 0, 1280, 720); t.toBlob(b => download(b, fileBase() + '_썸네일.png'), 'image/png');
 }
 // 한글 웹폰트는 글자 묶음별로 나뉘어 있어서, 쓸 글자를 미리 불러와야 캔버스에 제대로 그려짐
-async function fontsFor(text) { const t = text + '0123456789:/· 2ch괴담창작낭독다음이야기에서또만나요구독과좋아요는큰힘이됩니다오늘밤의'; const specs = ['700 52px "Nanum Myeongjo"', '800 96px "Nanum Myeongjo"', '400 30px "Nanum Myeongjo"', '600 46px "Noto Sans KR"', '400 30px "Noto Sans KR"', '700 46px "Noto Sans KR"', '900 70px "Noto Sans KR"', '600 26px "Noto Sans KR"'];
+async function fontsFor(text) { const t = text + '0123456789:/· 2ch괴담창작낭독다음이야기에서또만나요구독과좋아요는큰힘이됩니다오늘밤의끝까지들으면소름돋는하고듣기＞'; const specs = ['800 80px "Nanum Myeongjo"', '700 58px "Noto Sans KR"', '700 52px "Nanum Myeongjo"', '800 96px "Nanum Myeongjo"', '400 30px "Nanum Myeongjo"', '600 46px "Noto Sans KR"', '400 30px "Noto Sans KR"', '700 46px "Noto Sans KR"', '900 70px "Noto Sans KR"', '600 26px "Noto Sans KR"'];
   try { await Promise.race([Promise.all(specs.map(f => document.fonts.load(f, t))), new Promise(r => setTimeout(r, 8000))]); } catch (e) { } }
 // ---------- 화면 ----------
 function renderSettings() {
@@ -918,7 +939,7 @@ async function make() {
   $('#bMake').addEventListener('click', make);
   $('#bPlay').addEventListener('click', () => PV.playing ? pvStop() : pvPlay());
   $('#seek').addEventListener('input', e => { if (!PROJ) return; const was = PV.playing; pvStop(true); PV.off = e.target.value / 1000 * PROJ.total; pvDraw(); if (was) pvPlay(); });
-  $('#bMP4').addEventListener('click', exportMP4); $('#bThumb').addEventListener('click', thumb);
+  $('#bMP4').addEventListener('click', () => exportMP4()); $('#bShort').addEventListener('click', () => exportMP4({ short: true })); $('#bThumb').addEventListener('click', thumb);
   $('#bSrt').addEventListener('click', () => download(new Blob([srt()], { type: 'text/plain;charset=utf-8' }), fileBase() + '.srt'));
   $('#bYt').addEventListener('click', () => { const t = ytText(); $('#ytOut').value = t; $('#ytOut').hidden = false; navigator.clipboard && navigator.clipboard.writeText(t).then(() => msg('유튜브 제목·설명·태그를 복사했습니다.'), () => { }); });
   $('#bWav').addEventListener('click', () => { const b = PROJ.mix, n = b.length, dv = new DataView(new ArrayBuffer(44 + n * 4)), w = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };

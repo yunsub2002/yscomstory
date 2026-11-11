@@ -54,7 +54,7 @@ h1{font-size:22px;margin:6px 0 4px}p.s{color:#9aa0a8;margin:0 0 18px;font-size:1
 .b{padding:12px 14px 14px;display:grid;gap:8px}.b h2{margin:0;font-size:17px}.m{color:#9aa0a8;font-size:12.5px}
 .r{display:flex;gap:8px;flex-wrap:wrap}.r a,.r button{flex:1;min-width:120px;text-align:center;font:inherit;font-weight:700;font-size:14px;color:#fff;background:#b3261e;border:0;border-radius:10px;padding:11px;text-decoration:none;cursor:pointer}
 .r button,.r a.t{background:#2a2e34}details{font-size:12.5px;color:#9aa0a8}details pre{white-space:pre-wrap;font:inherit;background:#0b0c0e;padding:10px;border-radius:8px}
-</style></head><body><main><h1>괴담 영상 보관함</h1><p class="s">매주 월요일 밤 새 영상이 자동으로 올라옵니다. 영상 받기 → 사진 앱에 저장 → YouTube 앱에서 업로드 · 제목·설명은 "설명 복사"</p>
+</style></head><body><main><h1>괴담 영상 보관함</h1><p class="s">매주 월요일 밤 새 영상이 자동으로 올라옵니다. 숏츠(세로) 또는 가로 영상 받기 → 사진 앱에 저장 → YouTube 앱에서 업로드 · 제목·설명은 "설명 복사"</p>
 __LIST__
 </main><script>document.querySelectorAll('button[data-c]').forEach(b=>b.onclick=()=>{navigator.clipboard.writeText(document.getElementById(b.dataset.c).textContent).then(()=>{b.textContent='복사됨 ✓';setTimeout(()=>b.textContent='📋 설명 복사',1500)})});</script></body></html>'''
 
@@ -64,7 +64,7 @@ def render_page(gd, db):
     for k, v in enumerate(db):
         m, s = divmod(int(v['sec']), 60)
         items.append(f'''<div class="v"><img src="thumbs/{html.escape(v['thumb'])}" alt="" loading="lazy"><div class="b"><h2>{html.escape(v['title'])}</h2>
-<div class="m">{v['date']} · {m}분 {s:02d}초</div><div class="r"><a href="{html.escape(v['url'])}">⬇ 영상 받기</a><a class="t" href="{html.escape(v['thumb_url'])}">⬇ 썸네일</a><button data-c="d{k}">📋 설명 복사</button></div>
+<div class="m">{v['date']} · {m}분 {s:02d}초</div><div class="r">{f'<a href="{html.escape(v["short_url"])}">⬇ 숏츠(세로)</a>' if v.get('short_url') else ''}<a href="{html.escape(v['url'])}">⬇ 가로 영상</a><a class="t" href="{html.escape(v['thumb_url'])}">⬇ 썸네일</a><button data-c="d{k}">📋 설명 복사</button></div>
 <details><summary>제목·설명·태그 보기</summary><pre id="d{k}">{html.escape(v['yt'])}</pre></details></div></div>''')
     (gd / 'index.html').write_text(PAGE.replace('__LIST__', '\n'.join(items) or '<p>아직 영상이 없습니다.</p>'), encoding='utf-8')
 
@@ -95,7 +95,7 @@ def main():
     # 3) 릴리스에 영상·썸네일 올리기 (영상은 100MB가 넘어서 저장소 대신 릴리스)
     files = []
     for name, *_ in made:
-        png = out / f'{name}_썸네일.png'; tp = out / f'{name}_thumb.png'; png.rename(tp); files += [out / f'{name}.mp4', tp]
+        png = out / f'{name}_썸네일.png'; tp = out / f'{name}_thumb.png'; png.rename(tp); files += [out / f'{name}.mp4', tp] + ([out / f'{name}_short.mp4'] if (out / f'{name}_short.mp4').exists() else [])
     notes = '\n'.join(f'- {t} ({int(s) // 60}분 {int(s) % 60:02d}초)' for _, t, s, _ in made)
     sh('gh', 'release', 'create', tag, *files, '--repo', REPO, '--title', f'괴담 영상 {stamp:%Y-%m-%d}', '--notes', notes)
     # 4) 보관함 페이지 갱신
@@ -104,7 +104,7 @@ def main():
         subprocess.run([mv.ffmpeg_exe() if hasattr(mv, 'ffmpeg_exe') else 'ffmpeg', '-y', '-loglevel', 'error', '-i', str(out / f'{name}_thumb.png'), '-vf', 'scale=640:-1', '-q:v', '4', str(jpg)], check=True)
         yt = (out / f'{name}_유튜브.txt').read_text(encoding='utf-8')
         base = f'https://github.com/{REPO}/releases/download/{tag}/'
-        db.insert(0, {'title': title, 'sec': round(total), 'date': f'{stamp:%Y-%m-%d}', 'thumb': jpg.name, 'yt': yt, 'url': base + f'{name}.mp4', 'thumb_url': base + f'{name}_thumb.png'})
+        db.insert(0, {'title': title, 'sec': round(total), 'date': f'{stamp:%Y-%m-%d}', 'thumb': jpg.name, 'yt': yt, 'url': base + f'{name}.mp4', 'thumb_url': base + f'{name}_thumb.png', 'short_url': base + f'{name}_short.mp4' if (out / f'{name}_short.mp4').exists() else ''})
         used.append(h)
     (gd / 'videos.json').write_text(json.dumps(db, ensure_ascii=False, indent=1), encoding='utf-8')
     (gd / 'used.json').write_text(json.dumps(used[-500:]), encoding='utf-8'); render_page(gd, db)

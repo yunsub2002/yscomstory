@@ -86,6 +86,11 @@ def render(story_path, table, cache, out_mp4, res, channel, vbr):
         total = page.evaluate('PROJ.total'); print(f'  길이 {total / 60:.1f}분 — 영상 인코딩 시작', flush=True)
         with page.expect_download(timeout=7200000) as dl: page.click('#bMP4')
         dl.value.save_as(str(out_mp4) + '.tmp.mp4')
+        short_tmp = None
+        if total <= 180:  # 유튜브 숏츠는 3분 이하
+            print('  숏츠(세로) 인코딩', flush=True)
+            with page.expect_download(timeout=7200000) as d3: page.click('#bShort')
+            short_tmp = str(out_mp4.with_name(out_mp4.stem + '_short.tmp.mp4')); d3.value.save_as(short_tmp)
         with page.expect_download() as d2: page.click('#bThumb')
         d2.value.save_as(str(out_mp4.with_name(out_mp4.stem + '_썸네일.png')))
         yt = page.evaluate('ytText()'); srt = page.evaluate('srt()')
@@ -94,8 +99,11 @@ def render(story_path, table, cache, out_mp4, res, channel, vbr):
     out_mp4.with_name(out_mp4.stem + '_유튜브.txt').write_text(yt, encoding='utf-8')
     out_mp4.with_name(out_mp4.stem + '.srt').write_text(srt, encoding='utf-8')
     # 오디오 AAC 로 (아이폰 사진앱·유튜브 호환), 영상은 그대로
-    subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', str(out_mp4) + '.tmp.mp4', '-c:v', 'copy', '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11', '-ar', '48000', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', str(out_mp4)], check=True)
-    os.remove(str(out_mp4) + '.tmp.mp4')
+    def aac(src, dst):  # 오디오 AAC 로 (아이폰 사진앱·유튜브 호환), 영상은 그대로
+        subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', src, '-c:v', 'copy', '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11', '-ar', '48000', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', dst], check=True)
+        os.remove(src)
+    aac(str(out_mp4) + '.tmp.mp4', str(out_mp4))
+    if short_tmp: aac(short_tmp, str(out_mp4.with_name(out_mp4.stem + '_short.mp4')))
     return total
 
 
