@@ -1,0 +1,50 @@
+name: 괴담 영상 자동 제작
+
+on:
+  schedule:
+    - cron: '0 12 * * 1'   # 매주 월요일 21:00 (한국 시간)
+  workflow_dispatch:
+    inputs:
+      count:
+        description: '이번에 만들 편수'
+        default: '3'
+
+permissions:
+  contents: write
+  pages: read
+
+concurrency:
+  group: goedam
+  cancel-in-progress: false
+
+jobs:
+  make:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: 프로그램 설치
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-noto-cjk
+          pip install -q supertonic playwright soundfile numpy
+          python -m playwright install --with-deps chromium
+      - name: AI 목소리 모델 캐시
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/supertonic3
+            goedam_bot/.tts_cache
+          key: supertonic3-v1
+      - name: 영상 만들기 + 올리기
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COUNT: ${{ github.event.inputs.count || '3' }}
+          CHANNEL: ''
+        run: python goedam_bot/weekly.py
