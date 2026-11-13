@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""GitHub Actions 에서 매주 실행: 새 괴담 N편 쓰기 → AI 목소리 영상 → 릴리스 업로드 → 보관함 페이지 갱신
-환경변수: GH_TOKEN, GITHUB_REPOSITORY, COUNT(기본 3), CHANNEL(채널 이름)
+"""GitHub Actions 에서 매주 실행: 20~30분 괴담 모음(잔잔한 남자 목소리) 쓰기 → 영상 → 릴리스 업로드 → 보관함 페이지 갱신
+환경변수: GH_TOKEN, GITHUB_REPOSITORY, COUNT(모음 편수, 기본 1), MINUTES(목표 길이 분, 기본 25), CHANNEL(채널 이름)
+모음 1편마다 그 안의 이야기 하나로 3분 이하 숏츠(세로)도 함께 만듭니다.
 """
 import datetime as dt, hashlib, html, json, os, random, re, subprocess, sys
 from pathlib import Path
@@ -11,7 +12,8 @@ sys.path.insert(0, str(BOT))
 import make_video as mv  # noqa: E402
 
 REPO = os.environ.get('GITHUB_REPOSITORY', 'yunsub2002/yscomstory')
-COUNT = int(os.environ.get('COUNT') or 3)
+COUNT = int(os.environ.get('COUNT') or 1)
+MINUTES = max(20, min(30, int(os.environ.get('MINUTES') or 25)))
 CHANNEL = os.environ.get('CHANNEL', '')
 
 
@@ -54,7 +56,7 @@ h1{font-size:22px;margin:6px 0 4px}p.s{color:#9aa0a8;margin:0 0 18px;font-size:1
 .b{padding:12px 14px 14px;display:grid;gap:8px}.b h2{margin:0;font-size:17px}.m{color:#9aa0a8;font-size:12.5px}
 .r{display:flex;gap:8px;flex-wrap:wrap}.r a,.r button{flex:1;min-width:120px;text-align:center;font:inherit;font-weight:700;font-size:14px;color:#fff;background:#b3261e;border:0;border-radius:10px;padding:11px;text-decoration:none;cursor:pointer}
 .r button,.r a.t{background:#2a2e34}details{font-size:12.5px;color:#9aa0a8}details pre{white-space:pre-wrap;font:inherit;background:#0b0c0e;padding:10px;border-radius:8px}
-</style></head><body><main><h1>괴담 영상 보관함</h1><p class="s">매주 월요일 밤 새 영상이 자동으로 올라옵니다. 숏츠(세로) 또는 가로 영상 받기 → 사진 앱에 저장 → YouTube 앱에서 업로드 · 제목·설명은 "설명 복사"</p>
+</style></head><body><main><h1>괴담 영상 보관함</h1><p class="s">매주 월요일 밤 20~30분 괴담 모음과 숏츠가 자동으로 올라옵니다. 가로 영상 또는 숏츠(세로) 받기 → 사진 앱에 저장 → YouTube 앱에서 업로드 · 제목·설명은 "설명 복사"</p>
 __LIST__
 </main><script>document.querySelectorAll('button[data-c]').forEach(b=>b.onclick=()=>{navigator.clipboard.writeText(document.getElementById(b.dataset.c).textContent).then(()=>{b.textContent='복사됨 ✓';setTimeout(()=>b.textContent='📋 설명 복사',1500)})});</script></body></html>'''
 
@@ -75,40 +77,50 @@ def main():
     db = json.loads((gd / 'videos.json').read_text(encoding='utf-8')) if (gd / 'videos.json').exists() else []
     used = json.loads((gd / 'used.json').read_text(encoding='utf-8')) if (gd / 'used.json').exists() else []
     out = REPO_DIR / '_out'; out.mkdir(exist_ok=True); stories = []
-    # 1) 새 괴담 쓰기 — 예전에 쓴 이야기와 겹치지 않게
-    rnd = random.Random()
-    for tries in range(400):
+    # 1) 새 괴담 모음 쓰기 — 지난번 모음에 나온 무대는 뒤로 미루고, 예전 원고와 겹치지 않게
+    rnd = random.Random(); avoid = list(db[0].get('places', [])) if db else []
+    for tries in range(200):
         if len(stories) >= COUNT: break
-        txt = sh('node', BOT / 'gen_cli.js', rnd.randrange(1, 2**31), out=True)
+        seed = rnd.randrange(1, 2**31)
+        txt = sh('node', BOT / 'gen_cli.js', seed, 'episode', MINUTES, ','.join(avoid), out=True)
         h = hashlib.md5(txt.encode()).hexdigest()[:12]; title = txt.splitlines()[0].lstrip('# ').strip()
-        if h in used or any(title == s[1] for s in stories): continue
-        stories.append((txt, title, h))
+        if h in used: continue
+        places = re.findall(r'^\[챕터:([^|\]]+)\|', txt, re.M)
+        stories.append((txt, title, h, seed, places)); avoid = places
     stamp = dt.datetime.utcnow() + dt.timedelta(hours=9); tag = 'goedam-' + stamp.strftime('%Y%m%d-%H%M'); made = []
     # 2) 영상 만들기
-    for i, (txt, title, h) in enumerate(stories, 1):
+    for i, (txt, title, h, seed, places) in enumerate(stories, 1):
         name = f'goedam_{stamp:%Y%m%d}_{i:02d}'; sp = out / f'{name}.txt'; sp.write_text(txt, encoding='utf-8')
-        print(f'\n===== [{i}/{len(stories)}] {title} =====', flush=True)
-        items = mv.parse(txt); table = mv.synth(items, BOT / '.tts_cache')
-        total = mv.render(sp, table, BOT / '.tts_cache', out / f'{name}.mp4', 1080, CHANNEL, 3.5e6)
-        made.append((name, title, total, h))
+        print(f'\n===== [{i}/{len(stories)}] {title} — {", ".join(places)} =====', flush=True)
+        items = mv.parse(txt); print(f'  문장 {len(items)}개 음성 합성', flush=True); table = mv.synth(items, BOT / '.tts_cache')
+        total = mv.render(sp, table, BOT / '.tts_cache', out / f'{name}.mp4', 1080, CHANNEL, 2.4e6, main=True, short=False)
+        # 숏츠: 이 모음에 들어간 무대 하나로 3분 이하 짧은 버전
+        try:
+            st = sh('node', BOT / 'gen_cli.js', seed, 'short', places[0] if places else '', out=True)
+            ssp = out / f'{name}_s.txt'; ssp.write_text(st, encoding='utf-8'); print('\n  --- 숏츠 만들기 ---', flush=True)
+            stab = mv.synth(mv.parse(st), BOT / '.tts_cache')
+            mv.render(ssp, stab, BOT / '.tts_cache', out / f'{name}_s.mp4', 1080, CHANNEL, 3.5e6, main=False, short=True)
+            if (out / f'{name}_s_short.mp4').exists(): (out / f'{name}_s_short.mp4').rename(out / f'{name}_short.mp4')
+        except Exception as e: print('  숏츠는 건너뜀:', e, flush=True)
+        made.append((name, title, total, h, places))
     if not made: print('만든 영상이 없습니다.'); return
     # 3) 릴리스에 영상·썸네일 올리기 (영상은 100MB가 넘어서 저장소 대신 릴리스)
     files = []
     for name, *_ in made:
         png = out / f'{name}_썸네일.png'; tp = out / f'{name}_thumb.png'; png.rename(tp); files += [out / f'{name}.mp4', tp] + ([out / f'{name}_short.mp4'] if (out / f'{name}_short.mp4').exists() else [])
-    notes = '\n'.join(f'- {t} ({int(s) // 60}분 {int(s) % 60:02d}초)' for _, t, s, _ in made)
+    notes = '\n'.join(f'- {t} ({int(s) // 60}분 {int(s) % 60:02d}초) — {", ".join(p)}' for _, t, s, _, p in made)
     sh('gh', 'release', 'create', tag, *files, '--repo', REPO, '--title', f'괴담 영상 {stamp:%Y-%m-%d}', '--notes', notes)
     # 4) 보관함 페이지 갱신
-    for name, title, total, h in made:
+    for name, title, total, h, places in made:
         jpg = gd / 'thumbs' / f'{name}.jpg'
         subprocess.run([mv.ffmpeg_exe() if hasattr(mv, 'ffmpeg_exe') else 'ffmpeg', '-y', '-loglevel', 'error', '-i', str(out / f'{name}_thumb.png'), '-vf', 'scale=640:-1', '-q:v', '4', str(jpg)], check=True)
         yt = (out / f'{name}_유튜브.txt').read_text(encoding='utf-8')
         base = f'https://github.com/{REPO}/releases/download/{tag}/'
-        db.insert(0, {'title': title, 'sec': round(total), 'date': f'{stamp:%Y-%m-%d}', 'thumb': jpg.name, 'yt': yt, 'url': base + f'{name}.mp4', 'thumb_url': base + f'{name}_thumb.png', 'short_url': base + f'{name}_short.mp4' if (out / f'{name}_short.mp4').exists() else ''})
+        db.insert(0, {'title': title, 'sec': round(total), 'date': f'{stamp:%Y-%m-%d}', 'thumb': jpg.name, 'yt': yt, 'url': base + f'{name}.mp4', 'thumb_url': base + f'{name}_thumb.png', 'short_url': base + f'{name}_short.mp4' if (out / f'{name}_short.mp4').exists() else '', 'places': places})
         used.append(h)
     (gd / 'videos.json').write_text(json.dumps(db, ensure_ascii=False, indent=1), encoding='utf-8')
     (gd / 'used.json').write_text(json.dumps(used[-500:]), encoding='utf-8'); render_page(gd, db)
-    sh('git', 'add', gd, cwd=root); sh('git', 'commit', '-m', f'괴담 영상 {len(made)}편 추가 ({stamp:%Y-%m-%d})', cwd=root); push_safe(root, br)
+    sh('git', 'add', gd, cwd=root); sh('git', 'commit', '-m', f'괴담 모음 {len(made)}편 추가 ({stamp:%Y-%m-%d})', cwd=root); push_safe(root, br)
     user, rn = REPO.split('/'); print(f'\n완료 → https://{user}.github.io/{rn}/goedam/')
 
 

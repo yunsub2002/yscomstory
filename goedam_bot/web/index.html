@@ -651,6 +651,7 @@ function parse(src) {
     if ((m = L.match(/^\[장면\s*:\s*(.+?)\]$/))) { items.push({ k: 'scene', id: m[1].trim() }); continue; }
     if ((m = L.match(/^\[효과\s*:\s*(.+?)\]$/))) { items.push({ k: 'sfx', id: m[1].trim() }); continue; }
     if ((m = L.match(/^\[쉼\s*:\s*([\d.]+)\]$/))) { items.push({ k: 'gap', sec: +m[1] }); continue; }
+    if ((m = L.match(/^\[챕터\s*:\s*(.+?)\]$/))) { const [a, b] = m[1].split('|'); items.push({ k: 'chap', place: b ? a.trim() : '', title: (b || a).trim() }); continue; }
     let who = 'main', text = L; if ((m = L.match(/^(댓글|남|여)\s*:\s*(.*)$/))) { who = m[1]; text = m[2]; }
     for (const sen of splitSentences(text)) items.push({ k: 'say', who, text: sen });
   }
@@ -704,13 +705,14 @@ async function buildProject(src) {
   if (S.engine === 'azure' && (!S.key.trim() || !S.region.trim())) throw new Error('Azure 키와 지역을 먼저 넣어 주세요 (설정 ①). 키 없이 흐름만 보려면 음성 엔진을 "테스트"로.');
   let done = 0; const bufs = new Array(says.length); const q = says.map((x, i) => i); const K = S.engine === 'test' ? 8 : 3;
   await Promise.all(Array.from({ length: K }, async () => { while (q.length) { const i = q.shift(); bufs[i] = await TTS.get(says[i].text, voiceFor(says[i].who)); done++; msg(`음성 만드는 중… <b>${done}/${says.length}</b> 문장`, true); } }));
-  const clips = [], scenes = [], sfx = [], breaths = []; let t = INTO(), si = 0, lastScene = -99, rot = 0; const pool = S.scenes.split(',').filter(x => SCENES[x]); if (!pool.length) pool.push(...SCENE_IDS);
+  const clips = [], scenes = [], sfx = [], breaths = [], chapters = []; let t = INTO(), si = 0, lastScene = -99, rot = 0; const pool = S.scenes.split(',').filter(x => SCENES[x]); if (!pool.length) pool.push(...SCENE_IDS);
   const nextAuto = () => pool[(rot++) % pool.length];
   scenes.push({ t: 0, id: P.items.find(x => x.k === 'scene') ? P.items.find(x => x.k === 'scene').id : nextAuto() }); lastScene = 0;
   for (const it of P.items) {
     if (it.k === 'scene') { if (SCENES[it.id]) { const L = scenes[scenes.length - 1]; if (L.id === it.id) { } else if (t - L.t < 2) L.id = it.id; else scenes.push({ t, id: it.id }); lastScene = t; } continue; }
     if (it.k === 'sfx') { sfx.push({ t, id: it.id }); t += it.id === '정적' ? 1.1 : it.id === '노크' || it.id === '심장' || it.id === '발소리' ? .9 : .5; continue; }
     if (it.k === 'gap') { t += it.sec; continue; }
+    if (it.k === 'chap') { t += .8; chapters.push({ t, place: it.place, title: it.title, n: chapters.length + 1 }); sfx.push({ t, id: '종' }); t += 1.6; continue; }
     if (t - lastScene > 32) { let id = nextAuto(); if (id === scenes[scenes.length - 1].id) id = nextAuto(); scenes.push({ t: t - .4, id }); lastScene = t; }
     const b = bufs[si++], tx = it.text.trim(), prevGap = clips.length ? t - (clips[clips.length - 1].t + clips[clips.length - 1].dur) : 9;
     if (prevGap > .8 || (clips.length && clips[clips.length - 1].who !== it.who)) breaths.push(Math.max(0, t - .42));
@@ -718,7 +720,7 @@ async function buildProject(src) {
     t += b.duration + (/(\.\.\.|…)$/.test(tx) ? .85 : /[?!]$/.test(tx) ? .6 : /,$/.test(tx) ? .3 : it.who !== 'main' ? .55 : .48) + (Math.random() - .5) * .08;
   }
   const total = t + OUTRO;
-  return { title: P.title, clips, scenes, sfx, total, breaths };
+  return { title: P.title, clips, scenes, sfx, total, breaths, chapters };
 }
 function INTO() { return INTRO; }
 // ---------- 효과음 · 배경음 (절차 생성) ----------
@@ -796,7 +798,13 @@ function drawFrame(o, P, t, opt = {}) {
   // 제목 카드
   if (t < INTRO) { const a = Math.min(1, t / .8, (INTRO - t) / .7), fl = Math.random() < .04 ? .4 : 1; o.fillStyle = `rgba(0,0,0,${.55 * a})`; o.fillRect(0, 0, SW, SH);
     o.textAlign = 'center'; o.textBaseline = 'middle'; o.globalAlpha = a * fl; o.font = '800 96px "Nanum Myeongjo",serif'; o.fillStyle = '#e9e4da'; o.shadowColor = '#000'; o.shadowBlur = 30; o.fillText(P.title, SW / 2, SH / 2 - 10);
-    o.font = '400 30px "Nanum Myeongjo",serif'; o.fillStyle = 'rgba(210,200,190,.8)'; o.fillText('2ch 괴담 · 창작 낭독', SW / 2, SH / 2 + 80); o.shadowBlur = 0; o.globalAlpha = 1; }
+    o.font = '400 30px "Nanum Myeongjo",serif'; o.fillStyle = 'rgba(210,200,190,.8)'; o.fillText((P.chapters || []).length ? `괴담 모음 ${P.chapters.length}편 · 잔잔한 낭독` : '2ch 괴담 · 창작 낭독', SW / 2, SH / 2 + 80); o.shadowBlur = 0; o.globalAlpha = 1; }
+  // 이야기 제목 카드 (괴담 모음)
+  const ch = (P.chapters || []).find(c => t >= c.t - .3 && t < c.t + 4.6);
+  if (ch) { const a = Math.max(0, Math.min(1, (t - ch.t + .3) / .8, (ch.t + 4.6 - t) / .9)); o.fillStyle = `rgba(0,0,0,${.5 * a})`; o.fillRect(0, 0, SW, SH);
+    o.textAlign = 'center'; o.textBaseline = 'middle'; o.globalAlpha = a; o.shadowColor = '#000'; o.shadowBlur = 30;
+    o.font = '600 34px "Noto Sans KR",sans-serif'; o.fillStyle = 'rgba(214,80,70,.95)'; o.fillText(`제${ch.n}화${ch.place ? ' · ' + ch.place : ''}`, SW / 2, SH / 2 - 92);
+    o.font = '800 88px "Nanum Myeongjo",serif'; o.fillStyle = '#ece6da'; o.fillText(ch.title, SW / 2, SH / 2 + 4); o.shadowBlur = 0; o.globalAlpha = 1; }
   // 끝 카드
   if (t > P.total - OUTRO + .5) { const a = Math.min(1, (t - (P.total - OUTRO + .5)) / 1.2); o.fillStyle = `rgba(0,0,0,${.7 * a})`; o.fillRect(0, 0, SW, SH); o.globalAlpha = a; o.textAlign = 'center'; o.textBaseline = 'middle';
     o.font = '700 64px "Nanum Myeongjo",serif'; o.fillStyle = '#e9e4da'; o.fillText(S.channel || '오늘 밤의 괴담', SW / 2, SH / 2 - 30); o.font = '400 30px "Noto Sans KR",sans-serif'; o.fillStyle = 'rgba(210,200,190,.8)'; o.fillText('다음 이야기에서 또 만나요 · 구독과 좋아요는 큰 힘이 됩니다', SW / 2, SH / 2 + 50); o.globalAlpha = 1; }
@@ -889,21 +897,30 @@ const fileBase = () => (PROJ ? PROJ.title : 'story').replace(/[\\/:*?"<>|]/g, '_
 function srt() { const ts = s => { const ms = Math.round(s * 1000), h = ms / 3600000 | 0, m = ms / 60000 % 60 | 0, x = ms / 1000 % 60 | 0; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')},${String(ms % 1000).padStart(3, '0')}`; };
   return PROJ.clips.map((c, i) => `${i + 1}\n${ts(c.t)} --> ${ts(c.t + c.dur + .2)}\n${c.who === '댓글' ? '> ' : ''}${c.text}\n`).join('\n'); }
 function ytText() {
-  const P = PROJ, chap = []; let last = -99; P.scenes.forEach((s, i) => { if (s.t - last > 60 || i === 0) { chap.push(`${fmt(i === 0 ? 0 : s.t)} ${i === 0 ? '시작' : '이야기 ' + (chap.length)}`); last = s.t; } });
+  const P = PROJ; if ((P.chapters || []).length) return ytTextEp(P);
+  const chap = []; let last = -99; P.scenes.forEach((s, i) => { if (s.t - last > 60 || i === 0) { chap.push(`${fmt(i === 0 ? 0 : s.t)} ${i === 0 ? '시작' : '이야기 ' + (chap.length)}`); last = s.t; } });
   return `[제목]\n[2ch 괴담] ${P.title} | 잠들기 전 듣는 잔잔한 괴담 낭독\n\n[설명]\n${P.title}\n\n일본 익명 게시판 2ch 괴담 형식으로 만든 창작 이야기를 잔잔하게 읽어 드립니다.\n불 끄고, 이어폰 끼고 들어 보세요.\n\n${chap.join('\n')}\n\n※ 이 이야기는 2ch 괴담 형식으로 창작한 픽션입니다. 실제 인물·장소와 관계없습니다.\n※ 낭독: ${S.voiceCredit || "AI 음성(Microsoft Azure 신경망 음성)"} · 화면·효과음: 자체 제작\n\n#괴담 #2ch괴담 #무서운이야기 #괴담낭독 #공포 #수면괴담\n\n[태그]\n괴담, 2ch 괴담, 일본 괴담, 무서운 이야기, 공포 낭독, 괴담 낭독, 수면 괴담, 미스터리, 오컬트, ${P.title}`;
+}
+function ytTextEp(P) {
+  const mins = Math.round(P.total / 60), places = [...new Set(P.chapters.map(c => c.place).filter(Boolean))];
+  const chap = ['0:00 인트로'].concat(P.chapters.map(c => `${fmt(Math.max(1, c.t - .8))} 제${c.n}화 ${c.place ? c.place + ' — ' : ''}${c.title}`)); 
+  let yt = `[괴담 모음] ${P.title} | ${places.slice(0, 3).join('·')} | 잠들기 전 듣는 잔잔한 낭독 ${mins}분`; if (yt.length > 100) yt = `[괴담 모음] ${P.title} | 잔잔한 낭독 ${mins}분`;
+  return `[제목]\n${yt}\n\n[설명]\n${P.title} — 잠 못 드는 밤, 불 끄고 듣는 괴담 ${P.chapters.length}편 (${mins}분)\n\n익명 게시판 괴담 형식의 창작 이야기를, 낮고 잔잔한 목소리로 한 편씩 천천히 읽어 드립니다.\n각 이야기 끝에는 작성자의 추가 글(후기)도 함께 읽어 드려요.\n이어폰 끼고, 불 끄고 들어 보세요.\n\n📖 이야기 목록\n${chap.join('\n')}\n\n🔔 매주 새 괴담 모음이 올라옵니다. 구독하고 함께 들어요.\n💬 가장 무서웠던 이야기를 댓글로 알려 주세요.\n\n※ 이 영상의 이야기는 모두 창작한 픽션입니다. 실제 인물·장소·사건과 관계없습니다.\n※ 낭독: ${S.voiceCredit || 'AI 음성'} · 화면·효과음: 자체 제작\n\n#괴담 #괴담모음 #무서운이야기 #괴담낭독 #수면괴담 #공포라디오\n\n[태그]\n괴담, 괴담 모음, 무서운 이야기, 괴담 낭독, 공포 라디오, 수면 괴담, 잠잘 때 듣는 괴담, 2ch 괴담, 실화 괴담, 미스터리, ${places.join(', ')}`;
 }
 async function thumb() {
   await fontsFor((PROJ ? PROJ.title : parse($('#script').value).title) + S.channel); const cv = document.createElement('canvas'); cv.width = SW; cv.height = SH; const o = cv.getContext('2d'), P = PROJ || { scenes: [{ t: 0, id: SCENE_IDS[0] }], sfx: [], clips: [], total: 60, title: parse($('#script').value).title };
   const sc = sceneObj(P.scenes[Math.min(1, P.scenes.length - 1)].id, 99); drawScene(o, sc, 3, .4, 1, 0); drawFX(o, 3, 0);
   const g = o.createLinearGradient(0, 0, SW * .7, 0); g.addColorStop(0, 'rgba(0,0,0,.85)'); g.addColorStop(1, 'rgba(0,0,0,0)'); o.fillStyle = g; o.fillRect(0, 0, SW, SH);
-  o.textAlign = 'left'; o.textBaseline = 'alphabetic'; o.font = '900 70px "Noto Sans KR",sans-serif'; o.fillStyle = '#c4161c'; o.fillText('2ch 괴담', 90, 230);
+  o.textAlign = 'left'; o.textBaseline = 'alphabetic'; o.font = '900 70px "Noto Sans KR",sans-serif'; o.fillStyle = '#c4161c'; const EP = (P.chapters || []).length; o.fillText(EP ? '괴담 모음' : '2ch 괴담', 90, 230);
+  if (EP) { const lab = `${Math.round(P.total / 60)}분`, w = o.measureText('괴담 모음').width; o.font = '900 58px "Noto Sans KR",sans-serif'; const bw = o.measureText(lab).width + 52;
+    o.fillStyle = 'rgba(0,0,0,.6)'; o.strokeStyle = 'rgba(255,255,255,.75)'; o.lineWidth = 4; o.beginPath(); o.roundRect(90 + w + 30, 166, bw, 84, 42); o.fill(); o.stroke(); o.fillStyle = '#fff'; o.fillText(lab, 90 + w + 56, 230); }
   o.font = '800 150px "Nanum Myeongjo",serif'; const lines = wrap(o, P.title, SW * .62); o.lineJoin = 'round';
   lines.slice(0, 3).forEach((l, i) => { const y = 420 + i * 170; o.lineWidth = 16; o.strokeStyle = '#000'; o.strokeText(l, 90, y); o.fillStyle = '#f2ede2'; o.fillText(l, 90, y); });
   if (S.channel) { o.font = '700 46px "Noto Sans KR",sans-serif'; o.fillStyle = 'rgba(240,235,225,.8)'; o.fillText(S.channel, 90, SH - 90); }
   const t = document.createElement('canvas'); t.width = 1280; t.height = 720; t.getContext('2d').drawImage(cv, 0, 0, 1280, 720); t.toBlob(b => download(b, fileBase() + '_썸네일.png'), 'image/png');
 }
 // 한글 웹폰트는 글자 묶음별로 나뉘어 있어서, 쓸 글자를 미리 불러와야 캔버스에 제대로 그려짐
-async function fontsFor(text) { const t = text + '0123456789:/· 2ch괴담창작낭독다음이야기에서또만나요구독과좋아요는큰힘이됩니다오늘밤의끝까지들으면소름돋는하고듣기＞'; const specs = ['800 80px "Nanum Myeongjo"', '700 58px "Noto Sans KR"', '700 52px "Nanum Myeongjo"', '800 96px "Nanum Myeongjo"', '400 30px "Nanum Myeongjo"', '600 46px "Noto Sans KR"', '400 30px "Noto Sans KR"', '700 46px "Noto Sans KR"', '900 70px "Noto Sans KR"', '600 26px "Noto Sans KR"'];
+async function fontsFor(text) { const t = text + '0123456789:/· 제화편분모음잔잔한2ch괴담창작낭독다음이야기에서또만나요구독과좋아요는큰힘이됩니다오늘밤의끝까지들으면소름돋는하고듣기＞'; const specs = ['800 80px "Nanum Myeongjo"', '700 58px "Noto Sans KR"', '700 52px "Nanum Myeongjo"', '800 96px "Nanum Myeongjo"', '400 30px "Nanum Myeongjo"', '600 46px "Noto Sans KR"', '400 30px "Noto Sans KR"', '700 46px "Noto Sans KR"', '900 70px "Noto Sans KR"', '600 26px "Noto Sans KR"', '600 34px "Noto Sans KR"', '800 88px "Nanum Myeongjo"', '900 58px "Noto Sans KR"', '800 150px "Nanum Myeongjo"'];
   try { await Promise.race([Promise.all(specs.map(f => document.fonts.load(f, t))), new Promise(r => setTimeout(r, 8000))]); } catch (e) { } }
 // ---------- 화면 ----------
 function renderSettings() {
@@ -920,7 +937,7 @@ function scriptInfo() { const P = parse($('#script').value), says = P.items.filt
   $('#sInfo').innerHTML = `<b>${esc(P.title)}</b> · 문장 ${says.length}개 · ${chars.toLocaleString()}자 · 예상 길이 약 <b>${fmt(chars / 5.6 + says.length * .3 + INTRO + OUTRO)}</b>`; try { localStorage.setItem('horror-script', $('#script').value); } catch (e) { } }
 async function make() {
   pvStop(true); $('#bMake').disabled = true; $('#after').hidden = true;
-  try { PROJ = await buildProject($('#script').value); await fontsFor(PROJ.title + PROJ.clips.map(c => c.text).join('') + S.channel); msg('배경음·효과음 섞는 중…', true); PROJ.mix = await mixAudio(PROJ); PV.off = 0;
+  try { PROJ = await buildProject($('#script').value); await fontsFor(PROJ.title + PROJ.clips.map(c => c.text).join('') + (PROJ.chapters || []).map(c => c.place + c.title).join('') + S.channel); msg('배경음·효과음 섞는 중…', true); PROJ.mix = await mixAudio(PROJ); PV.off = 0;
     $('#after').hidden = false; pvDraw(); msg(`<b>준비 완료</b> — ${fmt(PROJ.total)} 길이. ▶ 미리보기로 확인한 뒤 <b>MP4로 저장</b>하세요.`); }
   catch (e) { msg('만들 수 없습니다: ' + esc(e.message || e) ); }
   finally { $('#bMake').disabled = false; }

@@ -6,8 +6,11 @@ on:
   workflow_dispatch:
     inputs:
       count:
-        description: '이번에 만들 편수'
-        default: '3'
+        description: '이번에 만들 괴담 모음 편수 (1편 = 20~30분 + 숏츠 1개)'
+        default: '1'
+      minutes:
+        description: '목표 길이(분, 20~30)'
+        default: '25'
 
 permissions:
   contents: write
@@ -38,13 +41,12 @@ jobs:
       - name: AI 목소리 모델 캐시
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.cache/supertonic3
-            goedam_bot/.tts_cache
-          key: supertonic3-v1
+          path: ~/.cache/supertonic3
+          key: supertonic3-model-v1
       - name: 영상 만들기 + 올리기
         env:
           GH_TOKEN: ${{ github.token }}
-          COUNT: ${{ github.event.inputs.count || '3' }}
+          COUNT: ${{ github.event.inputs.count || '1' }}
+          MINUTES: ${{ github.event.inputs.minutes || '25' }}
           CHANNEL: ''
         run: python goedam_bot/weekly.py
