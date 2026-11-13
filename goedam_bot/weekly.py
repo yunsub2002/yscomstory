@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """GitHub Actions 에서 실행 (기본: 월·목 저녁)
-- 20~30분 괴담 모음(잔잔한 남자 목소리) 1편 — 긴 영상만 (숏츠는 SHORTS=1 일 때만)
+- goedam_bot/scripts 의 원고(한 주제 · 약 30분 · 한 사람 낭독) 중 아직 안 만든 것 1편 → 영상
+- 원고가 다 떨어지면 아무것도 만들지 않고 끝냄 (엉터리 영상 대신)
 만든 영상 → 릴리스(보관) → 유튜브 자동 업로드(설정했을 때) → 보관함 페이지 갱신
 환경변수: GH_TOKEN, GITHUB_REPOSITORY, MODE(auto/episode/short), EP_DAYS(모음 요일, 0=월 … 6=일, 기본 0,3),
          MINUTES(목표 길이 분, 기본 25), CHANNEL, YT_CLIENT_ID/YT_CLIENT_SECRET/YT_REFRESH_TOKEN, YT_PRIVACY
@@ -60,7 +61,7 @@ h1{font-size:22px;margin:6px 0 4px}p.s{color:#9aa0a8;margin:0 0 18px;font-size:1
 .b{padding:12px 14px 14px;display:grid;gap:8px}.b h2{margin:0;font-size:17px}.m{color:#9aa0a8;font-size:12.5px}
 .r{display:flex;gap:8px;flex-wrap:wrap}.r a,.r button{flex:1;min-width:120px;text-align:center;font:inherit;font-weight:700;font-size:14px;color:#fff;background:#b3261e;border:0;border-radius:10px;padding:11px;text-decoration:none;cursor:pointer}
 .r button,.r a.t{background:#2a2e34}details{font-size:12.5px;color:#9aa0a8}details pre{white-space:pre-wrap;font:inherit;background:#0b0c0e;padding:10px;border-radius:8px}
-</style></head><body><main><h1>괴담 영상 보관함</h1><p class="s">매주 월·목 저녁 20~30분 괴담 모음이 자동으로 만들어집니다. 유튜브 연결을 해 두면 유튜브에도 자동으로 올라갑니다 (구글 심사 전에는 비공개 → 「유튜브 공개 설정」 눌러서 공개로 바꾸기).</p>
+</style></head><body><main><h1>괴담 영상 보관함</h1><p class="s">매주 월·목 저녁, 한 주제를 30분 동안 들려주는 미스터리·괴담 영상이 자동으로 만들어집니다. 유튜브 연결을 해 두면 유튜브에도 자동으로 올라갑니다 (구글 심사 전에는 비공개 → 「유튜브 공개 설정」 눌러서 공개로 바꾸기).</p>
 __LIST__
 </main><script>document.querySelectorAll('button[data-c]').forEach(b=>b.onclick=()=>{navigator.clipboard.writeText(document.getElementById(b.dataset.c).textContent).then(()=>{b.textContent='복사됨 ✓';setTimeout(()=>b.textContent='📋 설명 복사',1500)})});</script></body></html>'''
 
@@ -69,7 +70,7 @@ __LIST__
 def render_page(gd, db):
     items = []
     for k, v in enumerate(db):
-        m, s = divmod(int(v['sec']), 60); kind = '숏츠' if v.get('kind') == 'short' else '괴담 모음'
+        m, s = divmod(int(v['sec']), 60); kind = '숏츠' if v.get('kind') == 'short' else '30분 이야기'
         yt = ''.join(f'<a href="https://studio.youtube.com/video/{html.escape(i)}/edit">▶ 유튜브{lab} 공개 설정</a>' for i, lab in ((v.get('yt_id'), ''), (v.get('short_yt_id'), ' 숏츠')) if i)
         dl = ((f'<a class="t" href="{html.escape(v["url"])}">⬇ 영상</a>' if v.get('url') else '')
               + (f'<a class="t" href="{html.escape(v["short_url"])}">⬇ 숏츠</a>' if v.get('short_url') else '')
@@ -128,24 +129,28 @@ def main():
     base = f'https://github.com/{REPO}/releases/download/{tag}/'
     entry = {'date': f'{stamp:%Y-%m-%d}', 'kind': mode}
     if mode == 'episode':
-        # 1) 새 괴담 모음 쓰기 — 지난번 모음에 나온 무대는 뒤로 미루고, 예전 원고와 겹치지 않게
-        avoid = next((v.get('places', []) for v in db if v.get('kind', 'episode') == 'episode'), [])
-        for _ in range(50):
-            txt = sh('node', BOT / 'gen_cli.js', seed, 'episode', MINUTES, ','.join(avoid), out=True)
-            h = hashlib.md5(txt.encode()).hexdigest()[:12]
-            if h not in used: break
-            seed = rnd.randrange(1, 2**31)
-        title = txt.splitlines()[0].lstrip('# ').strip(); places = re.findall(r'^\[챕터:([^|\]]+)\|', txt, re.M)
+        # 1) 원고 대기열(goedam_bot/scripts)에서 아직 안 만든 원고 하나 — 한 주제 30분, 한 사람이 끝까지 읽는 이야기
+        done = {v.get('script') for v in db}
+        queue = [p for p in sorted((BOT / 'scripts').glob('*.txt')) if p.name not in done]
+        if not queue:
+            print('\n새 원고가 없습니다. 대화창에서 "괴담 원고 더 써줘"라고 하면 새 원고를 받아 업데이트_적용.bat 로 넣을 수 있습니다.', flush=True); return
+        src = queue[0]; meta = json.loads(src.with_suffix('.json').read_text(encoding='utf-8')) if src.with_suffix('.json').exists() else {}
+        print(f'남은 원고 {len(queue)}편 (이번 편 포함)', flush=True)
+        txt = src.read_text(encoding='utf-8'); h = src.name
+        title = next((l.lstrip('# ').strip() for l in txt.splitlines() if l.startswith('#')), src.stem); places = []
         sp = out / f'{name}.txt'; sp.write_text(txt, encoding='utf-8')
-        print(f'\n===== {title} — {", ".join(places)} =====', flush=True)
+        print(f'\n===== {title} ({src.name}) =====', flush=True)
         items = mv.parse(txt); print(f'  문장 {len(items)}개 음성 합성', flush=True); table = mv.synth(items, BOT / '.tts_cache')
-        total = mv.render(sp, table, BOT / '.tts_cache', out / f'{name}.mp4', 1080, CHANNEL, 2.4e6, main=True, short=False)
+        total = mv.render(sp, table, BOT / '.tts_cache', out / f'{name}.mp4', 1080, CHANNEL, 2.4e6, main=True, short=False, thumb=meta.get('thumb'))
         thumb = out / f'{name}_thumb.png'; (out / f'{name}_썸네일.png').rename(thumb)
-        yt = (out / f'{name}_유튜브.txt').read_text(encoding='utf-8')
-        splace = places[min(2, len(places) - 1)] if places else ''
-        sv = make_short(seed, splace, out, name) if SHORTS else None
-        files = [out / f'{name}.mp4', thumb] + ([sv[0]] if sv else [])
-        entry.update(title=title, sec=round(total), yt=yt, places=places, url=base + f'{name}.mp4', thumb_url=base + thumb.name, short_url=base + sv[0].name if sv else '')
+        eng = (out / f'{name}_유튜브.txt').read_text(encoding='utf-8')
+        chap = ['0:00 시작'] + [re.sub(r'^(\d+:\d\d) 제\d+화 (\S+부) — ', r'\1 \2. ', l) for l in eng.splitlines() if re.match(r'^\d+:\d\d 제\d+화', l)]
+        desc = meta.get('desc', title); cut = desc.find('\n\n※')
+        desc = (desc[:cut] if cut > 0 else desc) + '\n\n📖 목차\n' + '\n'.join(chap) + (desc[cut:] if cut > 0 else '')
+        yt = f"[제목]\n{meta.get('yt_title', title)}\n\n[설명]\n{desc}\n\n[태그]\n{', '.join(meta.get('tags', ['괴담', '미스터리']))}"
+        sv = None; splace = ''
+        files = [out / f'{name}.mp4', thumb]
+        entry.update(title=meta.get('yt_title', title), sec=round(total), yt=yt, places=places, script=src.name, url=base + f'{name}.mp4', thumb_url=base + thumb.name, short_url='')
     else:
         recent = [p for v in db[:6] if v.get('kind') == 'short' for p in (v.get('places') or [])]
         allp = all_places(); splace = rnd.choice([p for p in allp if p not in recent] or allp)

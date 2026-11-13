@@ -12,6 +12,9 @@ ROOT = Path(__file__).resolve().parent
 # 진행자·본문: M2 (가장 낮고 차분한 남자 목소리, 약 86Hz) / 댓글: M3 / 남자 대사: M1 / 여자 대사: F2
 VOICE = {'main': ('M2', .86), '댓글': ('M3', .95), '여': ('F2', .86), '남': ('M1', .9)}
 STEPS = 14
+# 기본 목소리: 마이크로소프트 신경망 음성 InJoon (무료 · 키 필요 없음, edge-tts). 실패하면 Supertonic 으로 자동 전환
+ENGINE = os.environ.get('VOICE_ENGINE', 'edge')
+EDGE_VOICE, EDGE_RATE, EDGE_PITCH = os.environ.get('EDGE_VOICE', 'ko-KR-InJoonNeural'), os.environ.get('EDGE_RATE', '-6%'), os.environ.get('EDGE_PITCH', '-2Hz')
 
 
 def sentences(text):
@@ -43,7 +46,37 @@ def parse(src):  # web/app.js 의 parse 와 같은 규칙
     return items
 
 
+def synth_edge(items, cache):
+    """한 사람 목소리(InJoon)로 문장마다 mp3 만들기 — 동시에 4개씩"""
+    import asyncio
+    if os.path.exists('/root/.ccr/ca-bundle.crt'):  # (테스트 환경용 인증서)
+        import certifi; certifi.where = lambda: '/root/.ccr/ca-bundle.crt'
+    import edge_tts
+    cache.mkdir(parents=True, exist_ok=True); table = {}; todo = []
+    for who, s in items:
+        key = hashlib.md5(f'edge|{EDGE_VOICE}|{EDGE_RATE}|{EDGE_PITCH}|{s}'.encode()).hexdigest()[:16]; f = cache / f'{key}.mp3'
+        table.setdefault(s, f.name)
+        if not f.exists() or f.stat().st_size < 500: todo.append((s, f))
+    async def one(sem, s, f):
+        async with sem:
+            for k in range(5):
+                try:
+                    await edge_tts.Communicate(s, EDGE_VOICE, rate=EDGE_RATE, pitch=EDGE_PITCH).save(str(f))
+                    if f.stat().st_size > 500: return
+                except Exception as e:
+                    if k == 4: raise
+                await asyncio.sleep(2 + k * 3)
+    async def run():
+        sem = asyncio.Semaphore(4); done = 0
+        for i in range(0, len(todo), 40):
+            await asyncio.gather(*(one(sem, s, f) for s, f in todo[i:i + 40])); done += len(todo[i:i + 40]); print(f'  음성 {done}/{len(todo)}', flush=True)
+    asyncio.run(run()); return table
+
+
 def synth(items, cache):
+    if ENGINE == 'edge':
+        try: return synth_edge(items, cache)
+        except Exception as e: print('  ! InJoon 음성 실패 → Supertonic 으로 대신 만듭니다:', e, flush=True)
     import numpy as np, soundfile as sf
     from supertonic import TTS
     tts = TTS(); styles = {}
@@ -69,7 +102,7 @@ def synth(items, cache):
     return table
 
 
-def render(story_path, table, cache, out_mp4, res, channel, vbr, main=True, short='auto'):
+def render(story_path, table, cache, out_mp4, res, channel, vbr, main=True, short='auto', thumb=None):
     """main: 가로 영상 · short: 'auto'(3분 이하일 때)/True/False"""
     from playwright.sync_api import sync_playwright
     src = story_path.read_text(encoding='utf-8')
@@ -78,14 +111,18 @@ def render(story_path, table, cache, out_mp4, res, channel, vbr, main=True, shor
         ctx = b.new_context(viewport={'width': 1400, 'height': 900}, accept_downloads=True)
         page = ctx.new_page(); errs = []
         page.on('pageerror', lambda e: errs.append(str(e)))
-        page.route('http://aud.local/**', lambda r: r.fulfill(path=str(cache / r.request.url.rsplit('/', 1)[1]), content_type='audio/wav'))
+        def serve(r):
+            n = r.request.url.rsplit('/', 1)[1]
+            if n == '__bgm': return r.fulfill(path=str(ROOT / 'web' / 'bgm_mystery.mp3'), content_type='audio/mpeg')
+            r.fulfill(path=str(cache / n), content_type='audio/mpeg' if n.endswith('.mp3') else 'audio/wav')
+        page.route('http://aud.local/**', serve)
         page.goto((ROOT / 'web' / 'index.html').as_uri()); page.wait_for_timeout(1500)
-        page.evaluate("""([src, table, res, channel, vbr]) => {
-          S.engine = 'ext'; S.res = res; S.channel = channel; S.vbr = vbr; S.bgm = .17; S.reverb = .14; S.voiceCredit = 'AI 음성(Supertonic) — 이 영상의 목소리는 AI가 생성했습니다'; window.showSaveFilePicker = undefined;
+        page.evaluate("""([src, table, res, channel, vbr, thumb]) => {
+          S.engine = 'ext'; S.res = res; S.channel = channel; S.vbr = vbr; S.bgm = .2; S.reverb = .1; S.bgmUrl = 'http://aud.local/__bgm'; S.noBreath = true; S.thumb = thumb; S.scenes = '숲,복도,창문,골목,방,터널'; S.voiceCredit = 'AI 음성 — 이 영상의 목소리는 AI가 생성했습니다'; window.showSaveFilePicker = undefined;
           TTS.get = async (text, voice) => { const f = table[text]; if (!f) throw new Error('음성 없음: ' + text);
             const ab = await (await fetch('http://aud.local/' + f)).arrayBuffer(); return await ac().decodeAudioData(ab); };
-          document.querySelector('#script').value = src; }""", [src, table, res, channel, vbr])
-        page.click('#bMake'); page.wait_for_selector('#after:not([hidden])', timeout=900000)
+          document.querySelector('#script').value = src; }""", [src, table, res, channel, vbr, thumb])
+        page.click('#bMake'); page.wait_for_selector('#after:not([hidden])', timeout=1800000)
         total = page.evaluate('PROJ.total'); print(f'  길이 {total / 60:.1f}분', flush=True)
         if main:
             page.evaluate('S.fps = PROJ.total > 600 ? 24 : 30')   # 긴 영상은 24fps (화면이 천천히 움직여서 차이 없음, 인코딩 빨라짐)

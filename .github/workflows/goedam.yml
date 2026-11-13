@@ -38,7 +38,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg fonts-noto-cjk
-          pip install -q supertonic playwright soundfile numpy
+          pip install -q supertonic playwright soundfile numpy edge-tts
           python -m playwright install --with-deps chromium
       - name: AI 목소리 모델 캐시
         uses: actions/cache@v4

@@ -753,6 +753,10 @@ function bgm(ctx, out, total) { // 어두운 드론 + 바람 + 가끔 유리 울
   let rr = 3; for (let t = 9; t < total - 4; t += 14 + (rr = (rr * 7 + 3) % 11)) { const f = [1568, 1760, 2093, 1397][rr % 4]; const o = ctx.createOscillator(); o.frequency.value = f; const a = ctx.createGain(); a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(.02, t + .05); a.gain.exponentialRampToValueAtTime(.0003, t + 4); o.connect(a).connect(g); o.start(t); o.stop(t + 4.1); }
   return g;
 }
+async function bgmFile(ctx, out, total) { // 미스터리 배경음 파일을 끊김 없이 반복
+  const ab = await (await fetch(S.bgmUrl)).arrayBuffer(), buf = await ctx.decodeAudioData(ab);
+  const g = ctx.createGain(); g.connect(out); const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.connect(g); s.start(0); s.stop(total); return g;
+}
 function reverbIR(ctx, sec = 2.6) { const n = ctx.sampleRate * sec, b = ctx.createBuffer(2, n, ctx.sampleRate); for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3); } return b; }
 async function mixAudio(P) {
   const oc = new OfflineAudioContext(2, Math.ceil(P.total * SR), SR), master = oc.createGain(); master.gain.value = .95;
@@ -769,9 +773,9 @@ async function mixAudio(P) {
   for (const c of P.clips) { const d = c.buf.getChannelData(0); let e = 0; for (let i = 0; i < d.length; i += 4) e += d[i] * d[i]; const rms = Math.sqrt(e / (d.length / 4)) || .05;
     const g = oc.createGain(); g.gain.value = Math.min(3, .085 / rms) * (c.who === '댓글' ? .92 : 1); const s = oc.createBufferSource(); s.buffer = c.buf; s.connect(g).connect(hp); s.start(c.t); }
   // 숨 들이쉬는 소리 (문단 시작·화자 바뀔 때)
-  const NB = noiseBuf(oc, 1); for (const t of (P.breaths || [])) { const s = oc.createBufferSource(); s.buffer = NB; const bp = oc.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.setValueAtTime(900, t); bp.frequency.linearRampToValueAtTime(1500, t + .32); bp.Q.value = .8;
+  const NB = noiseBuf(oc, 1); for (const t of (S.noBreath ? [] : (P.breaths || []))) { const s = oc.createBufferSource(); s.buffer = NB; const bp = oc.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.setValueAtTime(900, t); bp.frequency.linearRampToValueAtTime(1500, t + .32); bp.Q.value = .8;
     const lp = oc.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3200; const a = oc.createGain(); a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(.022, t + .2); a.gain.linearRampToValueAtTime(0, t + .36); s.connect(bp).connect(lp).connect(a).connect(voice); s.start(t, Math.random() * .5); s.stop(t + .4); }
-  const bg = bgm(oc, master, P.total), duck = bg.gain; duck.setValueAtTime(S.bgm, 0);
+  const bg = S.bgmUrl ? await bgmFile(oc, master, P.total) : bgm(oc, master, P.total), duck = bg.gain; duck.setValueAtTime(S.bgm, 0);
   for (const c of P.clips) { duck.setTargetAtTime(S.bgm * .62, Math.max(0, c.t - .2), .15); duck.setTargetAtTime(S.bgm, c.t + c.dur + .1, .5); }
   duck.setTargetAtTime(0, P.total - 2, .6);
   const fx = oc.createGain(); fx.gain.value = .9; fx.connect(master); fx.connect(rv); for (const e of P.sfx) sfx(oc, fx, e.id, e.t);
@@ -798,12 +802,12 @@ function drawFrame(o, P, t, opt = {}) {
   // 제목 카드
   if (t < INTRO) { const a = Math.min(1, t / .8, (INTRO - t) / .7), fl = Math.random() < .04 ? .4 : 1; o.fillStyle = `rgba(0,0,0,${.55 * a})`; o.fillRect(0, 0, SW, SH);
     o.textAlign = 'center'; o.textBaseline = 'middle'; o.globalAlpha = a * fl; o.font = '800 96px "Nanum Myeongjo",serif'; o.fillStyle = '#e9e4da'; o.shadowColor = '#000'; o.shadowBlur = 30; o.fillText(P.title, SW / 2, SH / 2 - 10);
-    o.font = '400 30px "Nanum Myeongjo",serif'; o.fillStyle = 'rgba(210,200,190,.8)'; o.fillText((P.chapters || []).length ? `괴담 모음 ${P.chapters.length}편 · 잔잔한 낭독` : '2ch 괴담 · 창작 낭독', SW / 2, SH / 2 + 80); o.shadowBlur = 0; o.globalAlpha = 1; }
+    o.font = '400 30px "Nanum Myeongjo",serif'; o.fillStyle = 'rgba(210,200,190,.8)'; o.fillText(S.thumb && S.thumb.label ? `${S.thumb.label} · ${Math.round(P.total / 60)}분` : (P.chapters || []).length ? `괴담 모음 ${P.chapters.length}편 · 잔잔한 낭독` : '2ch 괴담 · 창작 낭독', SW / 2, SH / 2 + 80); o.shadowBlur = 0; o.globalAlpha = 1; }
   // 이야기 제목 카드 (괴담 모음)
   const ch = (P.chapters || []).find(c => t >= c.t - .3 && t < c.t + 4.6);
   if (ch) { const a = Math.max(0, Math.min(1, (t - ch.t + .3) / .8, (ch.t + 4.6 - t) / .9)); o.fillStyle = `rgba(0,0,0,${.5 * a})`; o.fillRect(0, 0, SW, SH);
     o.textAlign = 'center'; o.textBaseline = 'middle'; o.globalAlpha = a; o.shadowColor = '#000'; o.shadowBlur = 30;
-    o.font = '600 34px "Noto Sans KR",sans-serif'; o.fillStyle = 'rgba(214,80,70,.95)'; o.fillText(`제${ch.n}화${ch.place ? ' · ' + ch.place : ''}`, SW / 2, SH / 2 - 92);
+    o.font = '600 34px "Noto Sans KR",sans-serif'; o.fillStyle = 'rgba(214,80,70,.95)'; o.fillText(/부$/.test(ch.place) ? ch.place : `제${ch.n}화${ch.place ? ' · ' + ch.place : ''}`, SW / 2, SH / 2 - 92);
     o.font = '800 88px "Nanum Myeongjo",serif'; o.fillStyle = '#ece6da'; o.fillText(ch.title, SW / 2, SH / 2 + 4); o.shadowBlur = 0; o.globalAlpha = 1; }
   // 끝 카드
   if (t > P.total - OUTRO + .5) { const a = Math.min(1, (t - (P.total - OUTRO + .5)) / 1.2); o.fillStyle = `rgba(0,0,0,${.7 * a})`; o.fillRect(0, 0, SW, SH); o.globalAlpha = a; o.textAlign = 'center'; o.textBaseline = 'middle';
@@ -912,11 +916,11 @@ async function thumb() {
   await fontsFor((PROJ ? PROJ.title : parse($('#script').value).title) + S.channel); const cv = document.createElement('canvas'); cv.width = SW; cv.height = SH; const o = cv.getContext('2d'), P = PROJ || { scenes: [{ t: 0, id: SCENE_IDS[0] }], sfx: [], clips: [], total: 60, title: parse($('#script').value).title };
   const sc = sceneObj(P.scenes[Math.min(1, P.scenes.length - 1)].id, 99); drawScene(o, sc, 3, .4, 1, 0); drawFX(o, 3, 0);
   const g = o.createLinearGradient(0, 0, SW * .7, 0); g.addColorStop(0, 'rgba(0,0,0,.85)'); g.addColorStop(1, 'rgba(0,0,0,0)'); o.fillStyle = g; o.fillRect(0, 0, SW, SH);
-  o.textAlign = 'left'; o.textBaseline = 'alphabetic'; o.font = '900 70px "Noto Sans KR",sans-serif'; o.fillStyle = '#c4161c'; const EP = (P.chapters || []).length; o.fillText(EP ? '괴담 모음' : '2ch 괴담', 90, 230);
-  if (EP) { const lab = `${Math.round(P.total / 60)}분`, w = o.measureText('괴담 모음').width; o.font = '900 58px "Noto Sans KR",sans-serif'; const bw = o.measureText(lab).width + 52;
+  o.textAlign = 'left'; o.textBaseline = 'alphabetic'; const TH = S.thumb || null; o.font = '900 70px "Noto Sans KR",sans-serif'; o.fillStyle = '#c4161c'; const EP = (P.chapters || []).length, LB = TH ? TH.label : EP ? '괴담 모음' : '2ch 괴담'; o.fillText(LB, 90, 230);
+  if (EP) { const lab = `${Math.round(P.total / 60)}분`, w = o.measureText(LB).width; o.font = '900 58px "Noto Sans KR",sans-serif'; const bw = o.measureText(lab).width + 52;
     o.fillStyle = 'rgba(0,0,0,.6)'; o.strokeStyle = 'rgba(255,255,255,.75)'; o.lineWidth = 4; o.beginPath(); o.roundRect(90 + w + 30, 166, bw, 84, 42); o.fill(); o.stroke(); o.fillStyle = '#fff'; o.fillText(lab, 90 + w + 56, 230); }
-  o.font = '800 150px "Nanum Myeongjo",serif'; const lines = wrap(o, P.title, SW * .62); o.lineJoin = 'round';
-  lines.slice(0, 3).forEach((l, i) => { const y = 420 + i * 170; o.lineWidth = 16; o.strokeStyle = '#000'; o.strokeText(l, 90, y); o.fillStyle = '#f2ede2'; o.fillText(l, 90, y); });
+  o.font = `800 ${TH ? 132 : 150}px "Nanum Myeongjo",serif`; const lines = TH ? TH.lines : wrap(o, P.title, SW * .62); o.lineJoin = 'round';
+  lines.slice(0, 3).forEach((l, i) => { const y = 420 + i * (TH ? 158 : 170); const red = TH && i === lines.length - 1 && lines.length > 1; o.lineWidth = 16; o.strokeStyle = '#000'; o.strokeText(l, 90, y); o.fillStyle = red ? '#ff3b30' : '#f2ede2'; o.fillText(l, 90, y); });
   if (S.channel) { o.font = '700 46px "Noto Sans KR",sans-serif'; o.fillStyle = 'rgba(240,235,225,.8)'; o.fillText(S.channel, 90, SH - 90); }
   const t = document.createElement('canvas'); t.width = 1280; t.height = 720; t.getContext('2d').drawImage(cv, 0, 0, 1280, 720); t.toBlob(b => download(b, fileBase() + '_썸네일.png'), 'image/png');
 }
