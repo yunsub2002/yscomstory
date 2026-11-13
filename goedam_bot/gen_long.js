@@ -200,9 +200,10 @@ function genEpisode(seed, opt = {}) {
     L.push(pick(st.who)); push(pick(st.bg)); L.push(''); push(st.start[0]); L.push(''); push(st.start[1]); L.push(''); cm(GEN.c1, 2); L.push('');
     L.push(`[장면:${st.scene[1]}]`); const od = r() < .5 ? [0, 1] : [1, 0]; push(st.odd[od[0]]); L.push(''); cm(GEN.c2, 1); L.push('', '[쉼:1]'); push(st.odd[od[1]]); L.push(''); cm(GEN.c1, 1); L.push('');
     const es = st.esc.slice(); for (let i = 0; i < 3; i++) { push(es.splice((r() * es.length) | 0, 1)[0]); L.push(''); }
-    cm(GEN.c2, 1); L.push('', `[장면:${st.scene[2]}]`, '[쉼:1]'); push(pick(st.climax)); L.push('', '[쉼:1.5]'); push(pick(st.after)); L.push('');
+    cm(GEN.c2, 1); L.push('', `[장면:${st.scene[2]}]`, '[쉼:1]'); const cl = pick(st.climax); push(cl); L.push('', '[쉼:1.5]'); push(pick(st.after)); L.push('');
     cm(GEN.c3, 2); L.push('', '[쉼:1]'); push(pick(st.follow)); L.push(''); cm(HOST.c4, 2); L.push('', '[쉼:1]');
-    return { title, place: st.place, lines: L, host: pick(st.host) };
+    const teaser = cl.filter(x => !/^\[/.test(x)).slice(0, 2);
+    return { title, place: st.place, lines: L, host: pick(st.host), teaser };
   };
   // 길이 추정 (잔잔한 남자 목소리: 1초에 약 5.6자 + 문장 사이 쉼)
   const est = lines => lines.reduce((a, l) => { if (/^\[(장면|효과|챕터)/.test(l)) return a + (/효과/.test(l) ? .7 : 0); const g = l.match(/^\[쉼:([\d.]+)\]/); if (g) return a + +g[1]; if (!l) return a + 1;
@@ -211,6 +212,9 @@ function genEpisode(seed, opt = {}) {
   for (const st of order) { if (sec >= minutes * 60 - 80 || picked.length >= 10) break; const x = story(st, picked.length); picked.push(x); sec += est(x.lines) * K + 10; }
   while (picked.length < 4 && picked.length < order.length) picked.push(story(order[picked.length], picked.length));
   const n = picked.length, title = pick(HOST.titles(n)), L = ['# ' + title, `[장면:${picked[0].lines[1].match(/장면:(.+)\]/)[1]}]`];
+  // 콜드 오픈: 첫 10~20초에 가장 무서운 장면을 먼저 들려줌 (시청 지속 시간용)
+  const tz = picked[Math.min(2, n - 1)];
+  L.push('[효과:정적]', ...tz.teaser, '[쉼:1.2]', '오늘 밤의 이야기, 지금 시작합니다.', '[쉼:1.5]', '');
   L.push(...pick(HOST.hello), pick(HOST.plan(n)), ...pick(HOST.mood), '[쉼:1.5]', '');
   picked.forEach((x, i) => {
     L.push(...x.lines, x.host);

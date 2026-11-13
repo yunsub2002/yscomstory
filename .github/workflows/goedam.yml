@@ -2,12 +2,14 @@ name: 괴담 영상 자동 제작
 
 on:
   schedule:
-    - cron: '0 12 * * 1'   # 매주 월요일 21:00 (한국 시간)
+    - cron: '37 10 * * 1,4'   # 매주 월·목 19:37 (한국 시간) 제작 시작 → 약 20:30 업로드 · 25분 괴담 모음
   workflow_dispatch:
     inputs:
-      count:
-        description: '이번에 만들 괴담 모음 편수 (1편 = 20~30분 + 숏츠 1개)'
-        default: '1'
+      mode:
+        description: '무엇을 만들까요 (episode = 20~30분 괴담 모음)'
+        type: choice
+        default: episode
+        options: [episode, short]
       minutes:
         description: '목표 길이(분, 20~30)'
         default: '25'
@@ -46,7 +48,13 @@ jobs:
       - name: 영상 만들기 + 올리기
         env:
           GH_TOKEN: ${{ github.token }}
-          COUNT: ${{ github.event.inputs.count || '1' }}
+          MODE: ${{ github.event.inputs.mode || 'episode' }}
+          SHORTS: '0'
+          EP_DAYS: '0,3'
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          YT_PRIVACY: ${{ vars.YT_PRIVACY || 'private' }}
           MINUTES: ${{ github.event.inputs.minutes || '25' }}
           CHANNEL: ''
         run: python goedam_bot/weekly.py

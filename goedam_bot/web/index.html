@@ -904,7 +904,8 @@ function ytText() {
 function ytTextEp(P) {
   const mins = Math.round(P.total / 60), places = [...new Set(P.chapters.map(c => c.place).filter(Boolean))];
   const chap = ['0:00 인트로'].concat(P.chapters.map(c => `${fmt(Math.max(1, c.t - .8))} 제${c.n}화 ${c.place ? c.place + ' — ' : ''}${c.title}`)); 
-  let yt = `[괴담 모음] ${P.title} | ${places.slice(0, 3).join('·')} | 잠들기 전 듣는 잔잔한 낭독 ${mins}분`; if (yt.length > 100) yt = `[괴담 모음] ${P.title} | 잔잔한 낭독 ${mins}분`;
+  // 검색어를 앞에: 무서운 이야기 / 괴담 모음 / 장소 이름 / 잠잘 때 듣는
+  let yt = `무서운 이야기 ${P.chapters.length}편 모음 | ${places.slice(0, 3).join('·')} 괴담 | 잠잘 때 듣는 공포 라디오 ${mins}분`; if (yt.length > 100) yt = `무서운 이야기 ${P.chapters.length}편 모음 | 잠잘 때 듣는 괴담 ${mins}분`;
   return `[제목]\n${yt}\n\n[설명]\n${P.title} — 잠 못 드는 밤, 불 끄고 듣는 괴담 ${P.chapters.length}편 (${mins}분)\n\n익명 게시판 괴담 형식의 창작 이야기를, 낮고 잔잔한 목소리로 한 편씩 천천히 읽어 드립니다.\n각 이야기 끝에는 작성자의 추가 글(후기)도 함께 읽어 드려요.\n이어폰 끼고, 불 끄고 들어 보세요.\n\n📖 이야기 목록\n${chap.join('\n')}\n\n🔔 매주 새 괴담 모음이 올라옵니다. 구독하고 함께 들어요.\n💬 가장 무서웠던 이야기를 댓글로 알려 주세요.\n\n※ 이 영상의 이야기는 모두 창작한 픽션입니다. 실제 인물·장소·사건과 관계없습니다.\n※ 낭독: ${S.voiceCredit || 'AI 음성'} · 화면·효과음: 자체 제작\n\n#괴담 #괴담모음 #무서운이야기 #괴담낭독 #수면괴담 #공포라디오\n\n[태그]\n괴담, 괴담 모음, 무서운 이야기, 괴담 낭독, 공포 라디오, 수면 괴담, 잠잘 때 듣는 괴담, 2ch 괴담, 실화 괴담, 미스터리, ${places.join(', ')}`;
 }
 async function thumb() {
