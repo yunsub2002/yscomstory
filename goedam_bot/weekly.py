@@ -140,7 +140,7 @@ def main():
         title = next((l.lstrip('# ').strip() for l in txt.splitlines() if l.startswith('#')), src.stem); places = []
         sp = out / f'{name}.txt'; sp.write_text(txt, encoding='utf-8')
         print(f'\n===== {title} ({src.name}) =====', flush=True)
-        items = mv.parse(txt); print(f'  문장 {len(items)}개 음성 합성', flush=True); table = mv.synth(items, BOT / '.tts_cache')
+        items = mv.parse(txt); print(f'  문장 {len(items)}개 음성 합성', flush=True); table = mv.synth(items, BOT / '.tts_cache', src=txt)
         total = mv.render(sp, table, BOT / '.tts_cache', out / f'{name}.mp4', 1080, CHANNEL, 2.4e6, main=True, short=False, thumb=meta.get('thumb'))
         thumb = out / f'{name}_thumb.png'; (out / f'{name}_썸네일.png').rename(thumb)
         eng = (out / f'{name}_유튜브.txt').read_text(encoding='utf-8')

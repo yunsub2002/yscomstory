@@ -717,7 +717,7 @@ async function buildProject(src) {
     const b = bufs[si++], tx = it.text.trim(), prevGap = clips.length ? t - (clips[clips.length - 1].t + clips[clips.length - 1].dur) : 9;
     if (prevGap > .8 || (clips.length && clips[clips.length - 1].who !== it.who)) breaths.push(Math.max(0, t - .42));
     clips.push({ t, dur: b.duration, buf: b, text: it.text, who: it.who });
-    t += b.duration + (/(\.\.\.|…)$/.test(tx) ? .85 : /[?!]$/.test(tx) ? .6 : /,$/.test(tx) ? .3 : it.who !== 'main' ? .55 : .48) + (Math.random() - .5) * .08;
+    t += b.duration + ((/(\.\.\.|…)$/.test(tx) ? .85 : /[?!]$/.test(tx) ? .6 : /,$/.test(tx) ? .3 : it.who !== 'main' ? .55 : .48) + (Math.random() - .5) * .08) * (S.gapK ?? 1);
   }
   const total = t + OUTRO;
   return { title: P.title, clips, scenes, sfx, total, breaths, chapters };

@@ -14,7 +14,8 @@ VOICE = {'main': ('M2', .86), '댓글': ('M3', .95), '여': ('F2', .86), '남': 
 STEPS = 14
 # 기본 목소리: 마이크로소프트 신경망 음성 InJoon (무료 · 키 필요 없음, edge-tts). 실패하면 Supertonic 으로 자동 전환
 ENGINE = os.environ.get('VOICE_ENGINE', 'edge')
-EDGE_VOICE, EDGE_RATE, EDGE_PITCH = os.environ.get('EDGE_VOICE', 'ko-KR-InJoonNeural'), os.environ.get('EDGE_RATE', '-6%'), os.environ.get('EDGE_PITCH', '-2Hz')
+# 목소리: Hyunsu(낮고 부드러운 남자 신경망 음성) · 보통 빠르기 · 살짝 낮게
+EDGE_VOICE, EDGE_RATE, EDGE_PITCH = os.environ.get('EDGE_VOICE', 'ko-KR-HyunsuMultilingualNeural'), os.environ.get('EDGE_RATE', '+0%'), os.environ.get('EDGE_PITCH', '-3Hz')
 
 
 def sentences(text):
@@ -46,6 +47,74 @@ def parse(src):  # web/app.js 의 parse 와 같은 규칙
     return items
 
 
+def paragraphs(src):
+    """빈 줄·[표시] 줄로 나뉜 문단 → [[문장, …], …] (한 문단은 한 번에 읽혀서 억양이 자연스럽게 이어짐)"""
+    out, cur = [], []
+    for raw in src.splitlines():
+        L = raw.strip()
+        if not L or L.startswith('#') or L.startswith('['):
+            if cur: out.append(cur); cur = []
+            continue
+        L = re.sub(r'^(댓글|남|여)\s*:\s*', '', L)
+        cur += sentences(L)
+        if len(''.join(cur)) > 420: out.append(cur); cur = []
+    if cur: out.append(cur)
+    return out
+
+
+def synth_para(src, cache):
+    """문단을 통째로 읽힌 뒤, 단어 위치(WordBoundary)로 문장마다 잘라 wav 로 저장 → {문장: 파일}"""
+    import asyncio, numpy as np, soundfile as sf
+    if os.path.exists('/root/.ccr/ca-bundle.crt'):
+        import certifi; certifi.where = lambda: '/root/.ccr/ca-bundle.crt'
+    import edge_tts
+    cache.mkdir(parents=True, exist_ok=True); paras = paragraphs(src); table = {}
+    norm = lambda x: re.sub(r'[^0-9A-Za-z\uac00-\ud7a3]', '', x)
+    async def one(sem, sents):
+        text = ' '.join(sents); key = hashlib.md5(f'para|{EDGE_VOICE}|{EDGE_RATE}|{EDGE_PITCH}|{text}'.encode()).hexdigest()[:16]
+        names = [f'{key}_{i}.wav' for i in range(len(sents))]
+        if all((cache / n).exists() for n in names): return sents, names
+        async with sem:
+            for k in range(5):
+                try:
+                    audio, words = b'', []
+                    async for ch in edge_tts.Communicate(text, EDGE_VOICE, rate=EDGE_RATE, pitch=EDGE_PITCH, boundary='WordBoundary').stream():
+                        if ch['type'] == 'audio': audio += ch['data']
+                        elif ch['type'] == 'WordBoundary': words.append((ch['offset'] / 1e7, (ch['offset'] + ch['duration']) / 1e7, norm(ch['text'])))
+                    if audio and words: break
+                except Exception:
+                    if k == 4: raise
+                await asyncio.sleep(2 + k * 3)
+        mp = cache / f'{key}.mp3'; mp.write_bytes(audio)
+        r = subprocess.run(['ffmpeg', '-v', 'error', '-i', str(mp), '-f', 's16le', '-ac', '1', '-ar', '24000', '-'], capture_output=True, check=True)
+        pcm = np.frombuffer(r.stdout, dtype='<i2'); sr = 24000; mp.unlink()
+        # 문장 경계(글자 수 누적) ↔ 단어 경계 맞추기
+        cum, acc = [], 0
+        for _, _, w in words: acc += len(w); cum.append(acc)
+        cuts, tot = [0], 0
+        for i, s in enumerate(sents[:-1]):
+            tot += len(norm(s)); j = next((k for k, c in enumerate(cum) if c >= tot), None)
+            if j is None or j + 1 >= len(words): cuts = None; break
+            cuts.append(int((words[j][1] + words[j + 1][0]) / 2 * sr))
+        if cuts is None or acc != sum(len(norm(x)) for x in sents):   # 맞지 않으면 문장 비율로 자르기
+            lens = [max(1, len(norm(x))) for x in sents]; T = len(pcm); c = 0; cuts = [0]
+            for L_ in lens[:-1]: c += L_; cuts.append(int(T * c / sum(lens)))
+        cuts.append(len(pcm))
+        for i, n in enumerate(names):
+            seg = pcm[cuts[i]:cuts[i + 1]].astype('float32') / 32768
+            f = min(len(seg), 240); seg[:f] *= np.linspace(0, 1, f); seg[-f:] *= np.linspace(1, 0, f)
+            sf.write(cache / n, seg, sr, subtype='PCM_16')
+        return sents, names
+    async def run():
+        sem = asyncio.Semaphore(4); res = []
+        for i in range(0, len(paras), 20):
+            res += await asyncio.gather(*(one(sem, p) for p in paras[i:i + 20])); print(f'  음성(문단) {min(i + 20, len(paras))}/{len(paras)}', flush=True)
+        return res
+    for sents, names in asyncio.run(run()):
+        for s_, n in zip(sents, names): table.setdefault(s_, n)
+    return table
+
+
 def synth_edge(items, cache):
     """한 사람 목소리(InJoon)로 문장마다 mp3 만들기 — 동시에 4개씩"""
     import asyncio
@@ -73,7 +142,13 @@ def synth_edge(items, cache):
     asyncio.run(run()); return table
 
 
-def synth(items, cache):
+def synth(items, cache, src=None):
+    if ENGINE == 'edge' and src:
+        try:
+            t = synth_para(src, cache)
+            if all(s in t for _, s in items): return t
+            print('  ! 일부 문장이 빠져 문장별로 다시 만듭니다', flush=True)
+        except Exception as e: print('  ! 문단 음성 실패 → 문장별로 만듭니다:', e, flush=True)
     if ENGINE == 'edge':
         try: return synth_edge(items, cache)
         except Exception as e: print('  ! InJoon 음성 실패 → Supertonic 으로 대신 만듭니다:', e, flush=True)
@@ -118,7 +193,7 @@ def render(story_path, table, cache, out_mp4, res, channel, vbr, main=True, shor
         page.route('http://aud.local/**', serve)
         page.goto((ROOT / 'web' / 'index.html').as_uri()); page.wait_for_timeout(1500)
         page.evaluate("""([src, table, res, channel, vbr, thumb]) => {
-          S.engine = 'ext'; S.res = res; S.channel = channel; S.vbr = vbr; S.bgm = .2; S.reverb = .1; S.bgmUrl = 'http://aud.local/__bgm'; S.noBreath = true; S.thumb = thumb; S.scenes = '숲,복도,창문,골목,방,터널'; S.voiceCredit = 'AI 음성 — 이 영상의 목소리는 AI가 생성했습니다'; window.showSaveFilePicker = undefined;
+          S.engine = 'ext'; S.res = res; S.channel = channel; S.vbr = vbr; S.bgm = .2; S.reverb = .1; S.bgmUrl = 'http://aud.local/__bgm'; S.noBreath = true; S.gapK = .3; S.thumb = thumb; S.scenes = '숲,복도,창문,골목,방,터널'; S.voiceCredit = 'AI 음성 — 이 영상의 목소리는 AI가 생성했습니다'; window.showSaveFilePicker = undefined;
           TTS.get = async (text, voice) => { const f = table[text]; if (!f) throw new Error('음성 없음: ' + text);
             const ab = await (await fetch('http://aud.local/' + f)).arrayBuffer(); return await ac().decodeAudioData(ab); };
           document.querySelector('#script').value = src; }""", [src, table, res, channel, vbr, thumb])
