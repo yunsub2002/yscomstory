@@ -131,7 +131,11 @@ def main():
     if mode == 'episode':
         # 1) 원고 대기열(goedam_bot/scripts)에서 아직 안 만든 원고 하나 — 한 주제 30분, 한 사람이 끝까지 읽는 이야기
         done = {v.get('script') for v in db}
-        queue = [p for p in sorted((BOT / 'scripts').glob('*.txt')) if p.name not in done]
+        order_f = BOT / 'scripts' / '순서.txt'
+        order = [l.strip() for l in order_f.read_text(encoding='utf-8').splitlines() if l.strip() and not l.startswith('#')] if order_f.exists() else []
+        allp = [p for p in sorted((BOT / 'scripts').glob('*.txt')) if p.name != '순서.txt']
+        allp.sort(key=lambda p: (order.index(p.name) if p.name in order else 999, p.name))
+        queue = [p for p in allp if p.name not in done]
         if not queue:
             print('\n새 원고가 없습니다. 대화창에서 "괴담 원고 더 써줘"라고 하면 새 원고를 받아 업데이트_적용.bat 로 넣을 수 있습니다.', flush=True); return
         src = queue[0]; meta = json.loads(src.with_suffix('.json').read_text(encoding='utf-8')) if src.with_suffix('.json').exists() else {}
