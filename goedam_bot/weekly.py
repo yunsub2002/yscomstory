@@ -48,8 +48,10 @@ def pages_dir():
     if br == cur: root = REPO_DIR
     else:
         root = REPO_DIR / '_pages'
-        sh('git', 'fetch', 'origin', br, cwd=REPO_DIR); sh('git', 'worktree', 'add', root, f'origin/{br}', cwd=REPO_DIR)
-        sh('git', 'checkout', '-B', br, cwd=root)
+        if not root.exists():
+            sh('git', 'fetch', 'origin', br, cwd=REPO_DIR); sh('git', 'worktree', 'add', root, f'origin/{br}', cwd=REPO_DIR)
+            sh('git', 'checkout', '-B', br, cwd=root)
+        else: sh('git', 'pull', '--rebase', 'origin', br, cwd=root, check=False)
     return root, br, (root / path / 'goedam' if path else root / 'goedam')
 
 
@@ -144,7 +146,8 @@ def main():
         title = next((l.lstrip('# ').strip() for l in txt.splitlines() if l.startswith('#')), src.stem); places = []
         sp = out / f'{name}.txt'; sp.write_text(txt, encoding='utf-8')
         print(f'\n===== {title} ({src.name}) =====', flush=True)
-        items = mv.parse(txt); print(f'  문장 {len(items)}개 음성 합성', flush=True); table = mv.synth(items, BOT / '.tts_cache', src=txt)
+        mv.EDGE_RATE = meta.get('rate') or os.environ.get('EDGE_RATE', '+0%')   # 원고마다 말 속도 (괴담은 조금 천천히)
+        items = mv.parse(txt); print(f'  문장 {len(items)}개 음성 합성 (속도 {mv.EDGE_RATE})', flush=True); table = mv.synth(items, BOT / '.tts_cache', src=txt)
         total = mv.render(sp, table, BOT / '.tts_cache', out / f'{name}.mp4', 1080, CHANNEL, 2.4e6, main=True, short=False, thumb=meta.get('thumb'))
         thumb = out / f'{name}_thumb.png'; (out / f'{name}_썸네일.png').rename(thumb)
         eng = (out / f'{name}_유튜브.txt').read_text(encoding='utf-8')
@@ -184,4 +187,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    n = max(1, min(4, int(os.environ.get('COUNT') or 1)))   # 한 번 실행에 몇 편 (최대 4)
+    for k in range(n):
+        print(f'\n########## {k + 1}/{n}편 ##########', flush=True)
+        main()
