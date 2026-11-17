@@ -14,8 +14,8 @@ VOICE = {'main': ('M2', .86), '댓글': ('M3', .95), '여': ('F2', .86), '남': 
 STEPS = 14
 # 기본 목소리: 마이크로소프트 신경망 음성 InJoon (무료 · 키 필요 없음, edge-tts). 실패하면 Supertonic 으로 자동 전환
 ENGINE = os.environ.get('VOICE_ENGINE', 'edge')
-# 목소리: Hyunsu(낮고 부드러운 남자 신경망 음성) · 보통 빠르기 · 살짝 낮게
-EDGE_VOICE, EDGE_RATE, EDGE_PITCH = os.environ.get('EDGE_VOICE', 'ko-KR-HyunsuMultilingualNeural'), os.environ.get('EDGE_RATE', '+0%'), os.environ.get('EDGE_PITCH', '-3Hz')
+# 목소리: 인준(담백한 저음 남자 음성) · 조금 느리게(-10%) · 낮게(-6Hz) — 잠들기 좋은 낭독 톤. EDGE_VOICE 로 바꿀 수 있음
+EDGE_VOICE, EDGE_RATE, EDGE_PITCH = os.environ.get('EDGE_VOICE') or 'ko-KR-InJoonNeural', os.environ.get('EDGE_RATE') or '-10%', os.environ.get('EDGE_PITCH') or '-6Hz'
 
 
 def sentences(text):
@@ -177,7 +177,7 @@ def synth(items, cache, src=None):
     return table
 
 
-def render(story_path, table, cache, out_mp4, res, channel, vbr, main=True, short='auto', thumb=None):
+def render(story_path, table, cache, out_mp4, res, channel, vbr, main=True, short='auto', thumb=None, images=None):
     """main: 가로 영상 · short: 'auto'(3분 이하일 때)/True/False"""
     from playwright.sync_api import sync_playwright
     src = story_path.read_text(encoding='utf-8')
@@ -189,14 +189,16 @@ def render(story_path, table, cache, out_mp4, res, channel, vbr, main=True, shor
         def serve(r):
             n = r.request.url.rsplit('/', 1)[1]
             if n == '__bgm': return r.fulfill(path=str(ROOT / 'web' / 'bgm_mystery.mp3'), content_type='audio/mpeg')
+            if n.startswith('__img'): return r.fulfill(path=str(images[int(n[5:])]), content_type='image/jpeg')
             r.fulfill(path=str(cache / n), content_type='audio/mpeg' if n.endswith('.mp3') else 'audio/wav')
         page.route('http://aud.local/**', serve)
         page.goto((ROOT / 'web' / 'index.html').as_uri()); page.wait_for_timeout(1500)
-        page.evaluate("""([src, table, res, channel, vbr, thumb]) => {
+        page.evaluate("""([src, table, res, channel, vbr, thumb, nimg]) => {
+          if (nimg) { S.imgUrls = Array.from({ length: nimg }, (_, i) => 'http://aud.local/__img' + i); S.imgPre = true; }
           S.engine = 'ext'; S.res = res; S.channel = channel; S.vbr = vbr; S.bgm = .2; S.reverb = .1; S.bgmUrl = 'http://aud.local/__bgm'; S.noBreath = true; S.gapK = .3; S.thumb = thumb; S.scenes = '숲,복도,창문,골목,방,터널'; S.voiceCredit = 'AI 음성 — 이 영상의 목소리는 AI가 생성했습니다'; window.showSaveFilePicker = undefined;
           TTS.get = async (text, voice) => { const f = table[text]; if (!f) throw new Error('음성 없음: ' + text);
             const ab = await (await fetch('http://aud.local/' + f)).arrayBuffer(); return await ac().decodeAudioData(ab); };
-          document.querySelector('#script').value = src; }""", [src, table, res, channel, vbr, thumb])
+          document.querySelector('#script').value = src; }""", [src, table, res, channel, vbr, thumb, len(images or [])])
         page.click('#bMake'); page.wait_for_selector('#after:not([hidden])', timeout=1800000)
         total = page.evaluate('PROJ.total'); print(f'  길이 {total / 60:.1f}분', flush=True)
         if main:

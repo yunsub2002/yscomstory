@@ -242,6 +242,7 @@ function makeScene(id, seed, img) {
   texInit(); const c = mkC(Math.round(SW * OV), Math.round(SH * OV)), r = srng(seed);
   let anim = () => { };
   if (img) { const x = c.getContext('2d'), s = Math.max(c.width / img.width, c.height / img.height); x.drawImage(img, (c.width - img.width * s) / 2, (c.height - img.height * s) / 2, img.width * s, img.height * s);
+    if (S.imgPre) return { id, c, anim, seed }; // 미리 보정된 장면 그림
     x.globalCompositeOperation = 'saturation'; x.fillStyle = 'hsl(0,0%,50%)'; x.globalAlpha = .7; x.fillRect(0, 0, c.width, c.height); x.globalAlpha = 1; x.globalCompositeOperation = 'multiply'; x.fillStyle = '#5c6670'; x.fillRect(0, 0, c.width, c.height); x.globalCompositeOperation = 'source-over'; }
   else anim = SCENES[id](c, r) || anim;
   return { id, c, anim, seed };
@@ -764,11 +765,13 @@ async function mixAudio(P) {
   const voice = oc.createGain(); voice.gain.value = 1.15; const rv = oc.createConvolver(); rv.buffer = reverbIR(oc, 1.6); const rg = oc.createGain(); rg.gain.value = S.reverb * .8;
   // 사람 목소리처럼: 저역 정리 → 따뜻함(200Hz) → 또렷함(3kHz) → 치찰음 완화(7.5kHz) → 부드러운 압축
   const hp = oc.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 75;
-  const warm = oc.createBiquadFilter(); warm.type = 'lowshelf'; warm.frequency.value = 220; warm.gain.value = 2.5;
-  const pres = oc.createBiquadFilter(); pres.type = 'peaking'; pres.frequency.value = 3000; pres.Q.value = .9; pres.gain.value = 1.8;
+  const W = !!S.bgmUrl;   // 낭독 모드: 따뜻한 라디오 음색 (고역을 부드럽게, 저역을 조금 두껍게)
+  const warm = oc.createBiquadFilter(); warm.type = 'lowshelf'; warm.frequency.value = W ? 160 : 220; warm.gain.value = W ? 3.5 : 2.5;
+  const pres = oc.createBiquadFilter(); pres.type = 'peaking'; pres.frequency.value = 3000; pres.Q.value = .9; pres.gain.value = W ? -2.2 : 1.8;
   const ess = oc.createBiquadFilter(); ess.type = 'peaking'; ess.frequency.value = 7500; ess.Q.value = 2; ess.gain.value = -3;
   const vc = oc.createDynamicsCompressor(); vc.threshold.value = -22; vc.ratio.value = 2.5; vc.attack.value = .008; vc.release.value = .2; vc.knee.value = 8;
-  hp.connect(warm).connect(pres).connect(ess).connect(vc).connect(voice); voice.connect(master); voice.connect(rv).connect(rg).connect(master);
+  const soft = oc.createBiquadFilter(); soft.type = 'lowpass'; soft.frequency.value = W ? 8200 : 16000; soft.Q.value = .5;
+  hp.connect(warm).connect(pres).connect(ess).connect(soft).connect(vc).connect(voice); voice.connect(master); voice.connect(rv).connect(rg).connect(master);
   const er = oc.createDelay(); er.delayTime.value = .018; const erg = oc.createGain(); erg.gain.value = .12; vc.connect(er).connect(erg).connect(master); // 가까운 벽 반사
   for (const c of P.clips) { const d = c.buf.getChannelData(0); let e = 0; for (let i = 0; i < d.length; i += 4) e += d[i] * d[i]; const rms = Math.sqrt(e / (d.length / 4)) || .05;
     const g = oc.createGain(); g.gain.value = Math.min(3, .085 / rms) * (c.who === '댓글' ? .92 : 1); const s = oc.createBufferSource(); s.buffer = c.buf; s.connect(g).connect(hp); s.start(c.t); }
@@ -942,7 +945,12 @@ function scriptInfo() { const P = parse($('#script').value), says = P.items.filt
   $('#sInfo').innerHTML = `<b>${esc(P.title)}</b> · 문장 ${says.length}개 · ${chars.toLocaleString()}자 · 예상 길이 약 <b>${fmt(chars / 5.6 + says.length * .3 + INTRO + OUTRO)}</b>`; try { localStorage.setItem('horror-script', $('#script').value); } catch (e) { } }
 async function make() {
   pvStop(true); $('#bMake').disabled = true; $('#after').hidden = true;
-  try { PROJ = await buildProject($('#script').value); await fontsFor(PROJ.title + PROJ.clips.map(c => c.text).join('') + (PROJ.chapters || []).map(c => c.place + c.title).join('') + S.channel); msg('배경음·효과음 섞는 중…', true); PROJ.mix = await mixAudio(PROJ); PV.off = 0;
+  try {
+    if (S.imgUrls && S.imgUrls.length && !userImgs.length) { msg('장면 그림 불러오는 중…', true);   // 이야기 장면 그림 (AI 생성)
+      for (const u of S.imgUrls) { const im = new Image(); im.src = URL.createObjectURL(await (await fetch(u)).blob()); await im.decode().catch(() => { }); /* blob 으로 불러와야 캔버스가 잠기지 않음 */ const i = userImgs.length; userImgs.push(im); SCENES['img' + i] = () => () => { }; } }
+    PROJ = await buildProject($('#script').value);
+    if (userImgs.length && S.imgUrls) { const n = userImgs.length, span = PROJ.total - INTRO - OUTRO;   // 그림을 이야기 순서대로 고르게 배치
+      PROJ.scenes = userImgs.map((_, i) => ({ t: i === 0 ? 0 : INTRO + span * i / n, id: 'img' + i })); } await fontsFor(PROJ.title + PROJ.clips.map(c => c.text).join('') + (PROJ.chapters || []).map(c => c.place + c.title).join('') + S.channel); msg('배경음·효과음 섞는 중…', true); PROJ.mix = await mixAudio(PROJ); PV.off = 0;
     $('#after').hidden = false; pvDraw(); msg(`<b>준비 완료</b> — ${fmt(PROJ.total)} 길이. ▶ 미리보기로 확인한 뒤 <b>MP4로 저장</b>하세요.`); }
   catch (e) { msg('만들 수 없습니다: ' + esc(e.message || e) ); }
   finally { $('#bMake').disabled = false; }

@@ -146,9 +146,16 @@ def main():
         title = next((l.lstrip('# ').strip() for l in txt.splitlines() if l.startswith('#')), src.stem); places = []
         sp = out / f'{name}.txt'; sp.write_text(txt, encoding='utf-8')
         print(f'\n===== {title} ({src.name}) =====', flush=True)
-        mv.EDGE_RATE = meta.get('rate') or os.environ.get('EDGE_RATE', '+0%')   # 원고마다 말 속도 (괴담은 조금 천천히)
+        if meta.get('rate'): mv.EDGE_RATE = meta['rate']   # 원고마다 말 속도를 따로 정할 수도 있음
         items = mv.parse(txt); print(f'  문장 {len(items)}개 음성 합성 (속도 {mv.EDGE_RATE})', flush=True); table = mv.synth(items, BOT / '.tts_cache', src=txt)
-        total = mv.render(sp, table, BOT / '.tts_cache', out / f'{name}.mp4', 1080, CHANNEL, 2.4e6, main=True, short=False, thumb=meta.get('thumb'))
+        imgs = []
+        if meta.get('images'):   # 이야기 장면 그림 (AI 생성, 무료) — 실패하면 기본 화면으로
+            try:   # 별도 프로세스로 그려서, 끝나면 메모리를 깨끗이 비움 (영상 인코딩에 메모리 필요)
+                print(f'  장면 그림 {len(meta["images"])}장 그리기', flush=True)
+                subprocess.run([sys.executable, str(BOT / 'images.py'), str(src.with_suffix('.json')), str(out / 'imgs'), str(len(meta['images'])), str(sum(map(ord, src.name)) % 97)], check=True, timeout=3600)
+                imgs = [Path(l) for l in (out / 'imgs' / 'list.txt').read_text(encoding='utf-8').splitlines() if l.strip()]
+            except Exception as e: print('  ! 장면 그림 실패 → 기본 화면으로:', e, flush=True); imgs = []
+        total = mv.render(sp, table, BOT / '.tts_cache', out / f'{name}.mp4', 1080, CHANNEL, 2.6e6, main=True, short=False, thumb=meta.get('thumb'), images=imgs)
         thumb = out / f'{name}_thumb.png'; (out / f'{name}_썸네일.png').rename(thumb)
         eng = (out / f'{name}_유튜브.txt').read_text(encoding='utf-8')
         chap = ['0:00 시작'] + [re.sub(r'^(\d+:\d\d) 제\d+화 (\S+부) — ', r'\1 \2. ', l) for l in eng.splitlines() if re.match(r'^\d+:\d\d 제\d+화', l)]
