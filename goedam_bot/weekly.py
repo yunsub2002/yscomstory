@@ -12,7 +12,7 @@ from pathlib import Path
 BOT = Path(__file__).resolve().parent
 REPO_DIR = BOT.parent
 sys.path.insert(0, str(BOT))
-import make_video as mv, youtube_upload as yu  # noqa: E402
+import make_video as mv, youtube_upload as yu, hookshort as HS  # noqa: E402
 
 REPO = os.environ.get('GITHUB_REPOSITORY', 'yunsub2002/yscomstory')
 MODE = (os.environ.get('MODE') or 'episode').strip()
@@ -63,9 +63,19 @@ h1{font-size:22px;margin:6px 0 4px}p.s{color:#9aa0a8;margin:0 0 18px;font-size:1
 .b{padding:12px 14px 14px;display:grid;gap:8px}.b h2{margin:0;font-size:17px}.m{color:#9aa0a8;font-size:12.5px}
 .r{display:flex;gap:8px;flex-wrap:wrap}.r a,.r button{flex:1;min-width:120px;text-align:center;font:inherit;font-weight:700;font-size:14px;color:#fff;background:#b3261e;border:0;border-radius:10px;padding:11px;text-decoration:none;cursor:pointer}
 .r button,.r a.t{background:#2a2e34}details{font-size:12.5px;color:#9aa0a8}details pre{white-space:pre-wrap;font:inherit;background:#0b0c0e;padding:10px;border-radius:8px}
+.tabs{display:flex;gap:8px;margin:0 0 16px;position:sticky;top:0;background:#0e0f11;padding:8px 0;z-index:2}.tabs a{flex:1;text-align:center;font-weight:700;font-size:14.5px;color:#e8e4dc;background:#16181b;border:1px solid #2b2f35;border-radius:999px;padding:10px;text-decoration:none}
+.tabs a.on{background:#b3261e;border-color:#b3261e;color:#fff}.sec{display:none}.sec.on{display:block}
+.sg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.sv{background:#16181b;border:1px solid #2b2f35;border-radius:14px;overflow:hidden}.sv img{display:block;width:100%;aspect-ratio:9/16;object-fit:cover;background:#000}
+.sv .b{padding:10px}.sv h2{font-size:14px;line-height:1.4}.sv .r{gap:6px}.sv .r a,.sv .r button{min-width:0;padding:9px 2px;font-size:12.5px;white-space:nowrap}
 </style></head><body><main><h1>괴담 영상 보관함</h1><p class="s">매주 월·목 저녁, 한 주제를 30분 동안 들려주는 미스터리·괴담 영상이 자동으로 만들어집니다. 유튜브 연결을 해 두면 유튜브에도 자동으로 올라갑니다 (구글 심사 전에는 비공개 → 「유튜브 공개 설정」 눌러서 공개로 바꾸기).</p>
+<nav class="tabs"><a href="#long" data-t="long" class="on">🎬 30분 이야기</a><a href="#shorts" data-t="shorts">📱 숏츠</a></nav>
+<section class="sec on" id="long">
 __LIST__
-</main><script>document.querySelectorAll('button[data-c]').forEach(b=>b.onclick=()=>{navigator.clipboard.writeText(document.getElementById(b.dataset.c).textContent).then(()=>{b.textContent='복사됨 ✓';setTimeout(()=>b.textContent='📋 설명 복사',1500)})});</script></body></html>'''
+</section><section class="sec" id="shorts"><p class="s">이야기마다 가장 무서운 도입부를 세로로 다시 만든 숏츠입니다. ⬇ 숏츠 받기 → 사진 앱에 저장 → YouTube 앱 [＋] → 쇼츠 → 영상 고르기 → 제목·설명·태그 버튼으로 복사해서 붙여 넣기</p>
+<div class="sg">__SHORTS__</div></section>
+</main><script>document.querySelectorAll('button[data-c]').forEach(b=>b.onclick=()=>{const o=b.textContent;navigator.clipboard.writeText(document.getElementById(b.dataset.c).textContent).then(()=>{b.textContent='복사됨 ✓';setTimeout(()=>b.textContent=o,1500)})});
+function tab(t){document.querySelectorAll('.tabs a').forEach(a=>a.classList.toggle('on',a.dataset.t===t));document.querySelectorAll('.sec').forEach(s=>s.classList.toggle('on',s.id===t))}
+document.querySelectorAll('.tabs a').forEach(a=>a.onclick=e=>{e.preventDefault();tab(a.dataset.t);history.replaceState(null,'','#'+a.dataset.t)});if(location.hash==='#shorts')tab('shorts');</script></body></html>'''
 
 
 
@@ -81,7 +91,18 @@ def render_page(gd, db):
         items.append(f'<div class="v"><img src="thumbs/{html.escape(v["thumb"])}" alt="" loading="lazy"><div class="b"><h2>{html.escape(v["title"])}</h2>\n'
                      f'<div class="m">{v["date"]} · {kind} · {m}분 {s:02d}초{up}</div><div class="r">{yt}{dl}<button data-c="d{k}">📋 설명 복사</button></div>\n'
                      f'<details><summary>제목·설명·태그 보기</summary><pre id="d{k}">{html.escape(v["yt"])}</pre></details></div></div>')
-    (gd / 'index.html').write_text(PAGE.replace('__LIST__', '\n'.join(items) or '<p>아직 영상이 없습니다.</p>'), encoding='utf-8')
+    shorts = []
+    for k, v in enumerate(db):
+        if not v.get('short_url'): continue
+        syt = v.get('short_yt') or v['yt']; part = lambda key: (syt.split(f'[{key}]\n', 1)[1].split('\n\n[', 1)[0].strip() if f'[{key}]' in syt else '')
+        img = v.get('short_thumb') or v['thumb']; sec = v.get('short_sec') or (v['sec'] if v['sec'] <= 180 else 0)
+        ytl = f'<a href="https://studio.youtube.com/video/{html.escape(v["short_yt_id"])}/edit">▶ 유튜브 공개 설정</a>' if v.get('short_yt_id') else ''
+        shorts.append(f'<div class="sv"><img src="thumbs/{html.escape(img)}" alt="" loading="lazy"><div class="b"><h2>{html.escape(part("제목") or v["title"])}</h2>'
+                      f'<div class="m">{v["date"]}' + (f' · {sec}초' if sec else '') + f'</div><div class="r"><a href="{html.escape(v["short_url"])}">⬇ 숏츠 받기</a>{ytl}</div>'
+                      f'<div class="r"><button data-c="st{k}">제목</button><button data-c="sd{k}">설명</button><button data-c="sg{k}">태그</button></div>'
+                      f'<span id="st{k}" hidden>{html.escape(part("제목"))}</span><span id="sd{k}" hidden>{html.escape(part("설명"))}</span><span id="sg{k}" hidden>{html.escape(part("태그"))}</span></div></div>')
+    page = PAGE.replace('__LIST__', '\n'.join(items) or '<p>아직 영상이 없습니다.</p>').replace('__SHORTS__', '\n'.join(shorts) or '<p class="s">아직 숏츠가 없습니다.</p>')
+    (gd / 'index.html').write_text(page, encoding='utf-8')
 
 
 def short_text(title, place):
@@ -165,6 +186,14 @@ def main():
         sv = None; splace = ''
         files = [out / f'{name}.mp4', thumb]
         entry.update(title=meta.get('yt_title', title), sec=round(total), yt=yt, places=places, script=src.name, url=base + f'{name}.mp4', thumb_url=base + thumb.name, short_url='')
+        hs = None
+        if os.environ.get('HOOK_SHORT', '1') == '1':                                  # 도입부 세로 숏츠도 함께 (같은 장면 그림 재사용)
+            try:
+                print('\n  --- 도입부 숏츠 ---', flush=True); hs = HS.from_script(src, out, name, CHANNEL, imgs=imgs[:4], log=lambda s: print(s, flush=True))
+            except Exception as e: print('  ! 도입부 숏츠 건너뜀:', e, flush=True); hs = None
+        if hs:
+            files.append(hs['file']); sj = gd / 'thumbs' / f'{name}_s.jpg'; HS.frame_jpg(hs['file'], sj)
+            entry.update(short_url=base + hs['file'].name, short_yt=hs['yt'], short_thumb=sj.name, short_sec=hs['sec'])
     else:
         recent = [p for v in db[:6] if v.get('kind') == 'short' for p in (v.get('places') or [])]
         allp = all_places(); splace = rnd.choice([p for p in allp if p not in recent] or allp)
@@ -181,6 +210,7 @@ def main():
     if mode == 'episode':
         entry['yt_id'] = yt_up(out / f'{name}.mp4', yt, thumb=thumb)
         if sv: entry['short_yt_id'] = yt_up(sv[0], short_text(sv[1], splace))
+        elif hs: entry['short_yt_id'] = yt_up(hs['file'], hs['yt'])
     else:
         entry['short_yt_id'] = yt_up(sv[0], yt)
     # 4) 보관함 페이지 갱신
@@ -194,6 +224,8 @@ def main():
 
 
 if __name__ == '__main__':
+    if MODE == 'backfill':                                          # 지금까지 만든 영상 전부 → 숏츠
+        import backfill_shorts; backfill_shorts.run(); sys.exit(0)
     n = max(1, min(4, int(os.environ.get('COUNT') or 1)))   # 한 번 실행에 몇 편 (최대 4)
     for k in range(n):
         print(f'\n########## {k + 1}/{n}편 ##########', flush=True)

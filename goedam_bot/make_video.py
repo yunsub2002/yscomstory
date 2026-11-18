@@ -178,7 +178,7 @@ def synth(items, cache, src=None):
     return table
 
 
-def render(story_path, table, cache, out_mp4, res, channel, vbr, main=True, short='auto', thumb=None, images=None):
+def render(story_path, table, cache, out_mp4, res, channel, vbr, main=True, short='auto', thumb=None, images=None, opts=None):
     """main: 가로 영상 · short: 'auto'(3분 이하일 때)/True/False"""
     from playwright.sync_api import sync_playwright
     src = story_path.read_text(encoding='utf-8')
@@ -200,6 +200,7 @@ def render(story_path, table, cache, out_mp4, res, channel, vbr, main=True, shor
           TTS.get = async (text, voice) => { const f = table[text]; if (!f) throw new Error('음성 없음: ' + text);
             const ab = await (await fetch('http://aud.local/' + f)).arrayBuffer(); return await ac().decodeAudioData(ab); };
           document.querySelector('#script').value = src; }""", [src, table, res, channel, vbr, thumb, len(images or [])])
+        if opts: page.evaluate('o => Object.assign(S, o)', opts)          # 숏츠 라벨·처음/끝 문구 등
         page.click('#bMake'); page.wait_for_selector('#after:not([hidden])', timeout=1800000)
         total = page.evaluate('PROJ.total'); print(f'  길이 {total / 60:.1f}분', flush=True)
         if main:

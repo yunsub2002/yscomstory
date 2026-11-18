@@ -6,10 +6,10 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: '무엇을 만들까요 (episode = 20~30분 괴담 모음)'
+        description: '무엇을 만들까요 (episode = 30분 이야기 + 도입부 숏츠 · backfill = 지금까지 만든 영상 전부 숏츠로)'
         type: choice
         default: episode
-        options: [episode, short]
+        options: [episode, short, backfill]
       count:
         description: '이번에 만들 편수 (1~4, 한 편에 약 40~50분)'
         default: '1'
@@ -65,4 +65,5 @@ jobs:
           MINUTES: ${{ github.event.inputs.minutes || '25' }}
           COUNT: ${{ github.event.inputs.count || '1' }}
           CHANNEL: ''
+          BACKFILL_UPLOAD: '0'          # 1 이면 숏츠를 유튜브에 하루 5개까지 자동 업로드
         run: python goedam_bot/weekly.py
