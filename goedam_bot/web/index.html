@@ -712,7 +712,7 @@ async function buildProject(src) {
   for (const it of P.items) {
     if (it.k === 'scene') { if (SCENES[it.id]) { const L = scenes[scenes.length - 1]; if (L.id === it.id) { } else if (t - L.t < 2) L.id = it.id; else scenes.push({ t, id: it.id }); lastScene = t; } continue; }
     if (it.k === 'sfx') { sfx.push({ t, id: it.id }); t += it.id === '정적' ? 1.1 : it.id === '노크' || it.id === '심장' || it.id === '발소리' ? .9 : .5; continue; }
-    if (it.k === 'gap') { t += it.sec; continue; }
+    if (it.k === 'gap') { t += it.sec * (S.pauseK ?? 1); continue; }   // [쉼:n] — pauseK 로 전체 쉼 길이 조절 (괴담 영상 .7)
     if (it.k === 'chap') { t += .8; chapters.push({ t, place: it.place, title: it.title, n: chapters.length + 1 }); sfx.push({ t, id: '종' }); t += 1.6; continue; }
     if (t - lastScene > 32) { let id = nextAuto(); if (id === scenes[scenes.length - 1].id) id = nextAuto(); scenes.push({ t: t - .4, id }); lastScene = t; }
     const b = bufs[si++], tx = it.text.trim(), prevGap = clips.length ? t - (clips[clips.length - 1].t + clips[clips.length - 1].dur) : 9;

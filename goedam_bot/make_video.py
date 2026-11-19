@@ -14,8 +14,8 @@ VOICE = {'main': ('M2', .86), '댓글': ('M3', .95), '여': ('F2', .86), '남': 
 STEPS = 14
 # 기본 목소리: 마이크로소프트 신경망 음성 InJoon (무료 · 키 필요 없음, edge-tts). 실패하면 Supertonic 으로 자동 전환
 ENGINE = os.environ.get('VOICE_ENGINE', 'edge')
-# 목소리: 인준(담백한 저음 남자 음성) · 살짝 느리게(-4%) · 낮게(-5Hz) · 작게 — ASMR 처럼 가깝고 서늘한 낭독 톤. EDGE_VOICE 로 바꿀 수 있음
-EDGE_VOICE, EDGE_RATE, EDGE_PITCH = os.environ.get('EDGE_VOICE') or 'ko-KR-InJoonNeural', os.environ.get('EDGE_RATE') or '-4%', os.environ.get('EDGE_PITCH') or '-5Hz'
+# 목소리: 현수(이야기하듯 자연스러운 남자 음성) · 살짝 빠르게(+4%) · 낮게(-6Hz) · 작게 — 처지지 않고 빠져드는 서늘한 이야기꾼 톤 (2026.11.19 샘플 3번). EDGE_VOICE 로 바꿀 수 있음
+EDGE_VOICE, EDGE_RATE, EDGE_PITCH = os.environ.get('EDGE_VOICE') or 'ko-KR-HyunsuMultilingualNeural', os.environ.get('EDGE_RATE') or '+4%', os.environ.get('EDGE_PITCH') or '-6Hz'
 EDGE_VOLUME = os.environ.get('EDGE_VOLUME') or '-8%'
 
 
@@ -196,7 +196,7 @@ def render(story_path, table, cache, out_mp4, res, channel, vbr, main=True, shor
         page.goto((ROOT / 'web' / 'index.html').as_uri()); page.wait_for_timeout(1500)
         page.evaluate("""([src, table, res, channel, vbr, thumb, nimg]) => {
           if (nimg) { S.imgUrls = Array.from({ length: nimg }, (_, i) => 'http://aud.local/__img' + i); S.imgPre = true; }
-          S.engine = 'ext'; S.res = res; S.channel = channel; S.vbr = vbr; S.bgm = .19; S.reverb = .03; S.bgmUrl = 'http://aud.local/__bgm'; S.noBreath = false; S.asmr = true; S.gapK = .3; S.thumb = thumb; S.scenes = '숲,복도,창문,골목,방,터널'; S.voiceCredit = 'AI 음성 — 이 영상의 목소리는 AI가 생성했습니다'; window.showSaveFilePicker = undefined;
+          S.engine = 'ext'; S.res = res; S.channel = channel; S.vbr = vbr; S.bgm = .19; S.reverb = .03; S.bgmUrl = 'http://aud.local/__bgm'; S.noBreath = false; S.asmr = true; S.gapK = .3; S.pauseK = .7; S.thumb = thumb; S.scenes = '숲,복도,창문,골목,방,터널'; S.voiceCredit = 'AI 음성 — 이 영상의 목소리는 AI가 생성했습니다'; window.showSaveFilePicker = undefined;
           TTS.get = async (text, voice) => { const f = table[text]; if (!f) throw new Error('음성 없음: ' + text);
             const ab = await (await fetch('http://aud.local/' + f)).arrayBuffer(); return await ac().decodeAudioData(ab); };
           document.querySelector('#script').value = src; }""", [src, table, res, channel, vbr, thumb, len(images or [])])

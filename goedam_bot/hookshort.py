@@ -34,7 +34,7 @@ def hook_script(txt, meta):
         hook.append(l)
     while hook and (not hook[-1].strip() or hook[-1].startswith('[쉼')): hook.pop()
     head = ' '.join(meta.get('thumb', {}).get('lines', [])) or lines[0].lstrip('# ').strip()
-    end = ('이 사건의 전체 기록은, 채널의 30분 영상에서 이어집니다.' if is_real(meta) else '이 이야기의 끝은, 채널의 30분 영상에서 들으실 수 있습니다.')
+    end = ('이 사건의 전체 기록은, 채널의 본편 영상에서 이어집니다.' if is_real(meta) else '이 이야기의 끝은, 채널의 본편 영상에서 들으실 수 있습니다.')
     return f'# {head}\n' + '\n'.join(hook) + f'\n[쉼:1.2]\n{end}\n', head
 
 
