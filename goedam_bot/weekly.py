@@ -22,6 +22,30 @@ MINUTES = max(20, min(30, int(os.environ.get('MINUTES') or 25)))
 CHANNEL = os.environ.get('CHANNEL', '')
 
 
+
+GD_SUB_LINE = '[쉼:1]\n잠깐만요. 이런 이야기 좋아하신다면, 구독과 알림 설정 꼭 눌러 주세요.\n매주 월요일과 목요일 저녁, 새로운 이야기를 들려 드립니다.\n[쉼:1.5]\n'
+GD_SUB_DESC = ('🔔 매주 월·목 저녁 8시 반, 새 괴담이 올라옵니다. 구독하고 알림 설정해 두세요!\n'
+               '👉 https://www.youtube.com/channel/UCTGBcatcPQOoK4NsiHCukuw?sub_confirmation=1\n')
+GD_FAMILY = ('\n\n📺 같이 보면 좋은 채널\n'
+             '· Dreamcore Sleep — 괴담 듣고 잠 안 올 때, 잠 오는 음악 https://www.youtube.com/@Moonsleep-g1c\n'
+             '· 세상의 모든 이야기 — 매일 1분 경제·생활 뉴스 https://www.youtube.com/@세상의모든이야기g1-c')
+
+
+def add_sub_line(txt):
+    """대본에서 두 번째 [챕터:] 바로 앞에 구독 부탁 멘트 (챕터가 2개 미만이면 전체 4분의 1 지점)"""
+    L = txt.splitlines(keepends=True); idx = [i for i, l in enumerate(L) if l.lstrip().startswith('[챕터')]
+    at = idx[1] if len(idx) >= 2 else max(1, len(L) // 4)
+    return ''.join(L[:at]) + GD_SUB_LINE + ''.join(L[at:])
+
+
+def add_sub_desc(desc):
+    """설명: 이야기 소개·목차 다음(※ 안내 앞)에 구독 링크와 다른 채널"""
+    if 'sub_confirmation' in desc: return desc
+    blk = '\n\n' + GD_SUB_DESC + '\n' + GD_FAMILY.lstrip('\n')
+    cut = desc.find('\n\n※')
+    return desc[:cut] + blk + desc[cut:] if cut > 0 else desc + blk
+
+
 def sh(*cmd, cwd=None, check=True, out=False):
     print('  >', ' '.join(str(c) for c in cmd), flush=True)
     r = subprocess.run([str(c) for c in cmd], cwd=cwd, check=check, text=True, capture_output=out)
@@ -165,6 +189,7 @@ def main():
         print(f'남은 원고 {len(queue)}편 (이번 편 포함)', flush=True)
         txt = src.read_text(encoding='utf-8'); h = src.name
         title = next((l.lstrip('# ').strip() for l in txt.splitlines() if l.startswith('#')), src.stem); places = []
+        if os.environ.get('SUB_LINE', '1') == '1': txt = add_sub_line(txt)            # 앞부분 끝(2부 시작 전)에 구독 부탁 한 줄
         sp = out / f'{name}.txt'; sp.write_text(txt, encoding='utf-8')
         print(f'\n===== {title} ({src.name}) =====', flush=True)
         if meta.get('rate'): mv.EDGE_RATE = meta['rate']   # 원고마다 말 속도를 따로 정할 수도 있음
@@ -182,6 +207,7 @@ def main():
         chap = ['0:00 시작'] + [re.sub(r'^(\d+:\d\d) 제\d+화 (\S+부) — ', r'\1 \2. ', l) for l in eng.splitlines() if re.match(r'^\d+:\d\d 제\d+화', l)]
         desc = meta.get('desc', title); cut = desc.find('\n\n※')
         desc = (desc[:cut] if cut > 0 else desc) + '\n\n📖 목차\n' + '\n'.join(chap) + (desc[cut:] if cut > 0 else '')
+        desc = add_sub_desc(desc)
         yt = f"[제목]\n{meta.get('yt_title', title)}\n\n[설명]\n{desc}\n\n[태그]\n{', '.join(meta.get('tags', ['괴담', '미스터리']))}"
         sv = None; splace = ''
         files = [out / f'{name}.mp4', thumb]

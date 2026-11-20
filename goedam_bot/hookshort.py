@@ -46,7 +46,7 @@ def short_yt(meta, head):
     sents = re.split(r'(?<=[.!?。])\s+', first); lead = ' '.join(sents[:2]).strip()
     notes = '\n'.join(l for l in desc.splitlines() if l.startswith('※'))
     tags = list(dict.fromkeys(meta.get('tags', [])[:10] + ['shorts', '쇼츠', '괴담 쇼츠']))
-    body = (f'{lead}\n\n▶ 전체 이야기(30분)는 채널 영상에서 이어서 들을 수 있어요.\n\n' + (notes + '\n\n' if notes else '') +
+    body = (f'{lead}\n\n▶ 전체 이야기(30분)는 채널 영상에서 이어서 들을 수 있어요.\n🔔 구독하면 매주 월·목 새 괴담 → https://www.youtube.com/channel/UCTGBcatcPQOoK4NsiHCukuw?sub_confirmation=1\n\n' + (notes + '\n\n' if notes else '') +
             ' '.join('#' + t.replace(' ', '') for t in ['shorts'] + tags[:6]))
     return f'[제목]\n{title}\n\n[설명]\n{body}\n\n[태그]\n' + ', '.join(tags), title
 
