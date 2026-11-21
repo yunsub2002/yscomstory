@@ -713,7 +713,7 @@ async function buildProject(src) {
     if (it.k === 'scene') { if (SCENES[it.id]) { const L = scenes[scenes.length - 1]; if (L.id === it.id) { } else if (t - L.t < 2) L.id = it.id; else scenes.push({ t, id: it.id }); lastScene = t; } continue; }
     if (it.k === 'sfx') { sfx.push({ t, id: it.id }); t += it.id === '정적' ? 1.1 : it.id === '노크' || it.id === '심장' || it.id === '발소리' ? .9 : .5; continue; }
     if (it.k === 'gap') { t += it.sec * (S.pauseK ?? 1); continue; }   // [쉼:n] — pauseK 로 전체 쉼 길이 조절 (괴담 영상 .7)
-    if (it.k === 'chap') { t += .8; chapters.push({ t, place: it.place, title: it.title, n: chapters.length + 1 }); sfx.push({ t, id: '종' }); t += 1.6; continue; }
+    if (it.k === 'chap') { t += .8; chapters.push({ t, place: it.place, title: it.title, n: chapters.length + 1 }); t += 1.6; continue; }   // 챕터 종소리 없음 (요청으로 뺌)
     if (t - lastScene > 32) { let id = nextAuto(); if (id === scenes[scenes.length - 1].id) id = nextAuto(); scenes.push({ t: t - .4, id }); lastScene = t; }
     const b = bufs[si++], tx = it.text.trim(), prevGap = clips.length ? t - (clips[clips.length - 1].t + clips[clips.length - 1].dur) : 9;
     if (prevGap > .8 || (clips.length && clips[clips.length - 1].who !== it.who)) breaths.push(Math.max(0, t - .42));
@@ -736,12 +736,12 @@ function sfx(ctx, out, id, t) {
     case '심장': for (let i = 0; i < 3; i++) { const a = t + i * .9; tone(a, 70, 40, .16, .9); tone(a + .2, 62, 36, .18, .7); } break;
     case '바람': { const s = ctx.createBufferSource(); s.buffer = N; s.loop = true; const fl = ctx.createBiquadFilter(); fl.type = 'bandpass'; fl.Q.value = 2; fl.frequency.setValueAtTime(300, t); fl.frequency.linearRampToValueAtTime(900, t + 1.5); fl.frequency.linearRampToValueAtTime(350, t + 3.2);
       const a = ctx.createGain(); a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(.35, t + 1.2); a.gain.linearRampToValueAtTime(0, t + 3.4); s.connect(fl).connect(a).connect(out); s.start(t); s.stop(t + 3.5); break; }
-    case '종': for (const [k, g, d] of [[1, .25, 3.5], [2.76, .12, 2.2], [5.4, .07, 1.4], [8.9, .03, .8]]) tone(t, 980 * k, 980 * k * .998, d, g); break;
+    case '종': break;   // 종소리 사용 안 함 (요청으로 뺌)
     case '전화': for (let r = 0; r < 2; r++) { const a = t + r * 1.6; for (const f of [440, 480]) { const o = ctx.createOscillator(); o.frequency.value = f; const g = ctx.createGain(); g.gain.setValueAtTime(0, a); g.gain.linearRampToValueAtTime(.08, a + .02); g.gain.setValueAtTime(.08, a + .9); g.gain.linearRampToValueAtTime(0, a + .95); o.connect(g).connect(out); o.start(a); o.stop(a + 1); } } break;
     case '정적': burst(t, 3000, .3, 1.1, .3, 'highpass'); break;
     case '문': { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(70, t); o.frequency.linearRampToValueAtTime(140, t + .6); o.frequency.linearRampToValueAtTime(90, t + 1.3); const fl = ctx.createBiquadFilter(); fl.type = 'bandpass'; fl.frequency.value = 1100; fl.Q.value = 6;
       const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 18; lg.gain.value = 600; lfo.connect(lg).connect(fl.frequency); const a = ctx.createGain(); a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(.2, t + .1); a.gain.linearRampToValueAtTime(0, t + 1.35); o.connect(fl).connect(a).connect(out); o.start(t); o.stop(t + 1.4); lfo.start(t); lfo.stop(t + 1.4); break; }
-    case '차임': [1319, 1047, 1175, 784].forEach((f, i) => tone(t + i * .32, f, f, 1.1, .12)); break;
+    case '차임': break;   // 차임(종 비슷한 소리)도 사용 안 함
   }
 }
 function bgm(ctx, out, total) { // 어두운 드론 + 바람 + 가끔 유리 울림

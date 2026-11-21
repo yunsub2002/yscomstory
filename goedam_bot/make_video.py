@@ -17,6 +17,23 @@ ENGINE = os.environ.get('VOICE_ENGINE', 'edge')
 # 목소리: 현수(이야기하듯 자연스러운 남자 음성) · 살짝 빠르게(+4%) · 낮게(-6Hz) · 작게 — 처지지 않고 빠져드는 서늘한 이야기꾼 톤 (2026.11.19 샘플 3번). EDGE_VOICE 로 바꿀 수 있음
 EDGE_VOICE, EDGE_RATE, EDGE_PITCH = os.environ.get('EDGE_VOICE') or 'ko-KR-HyunsuMultilingualNeural', os.environ.get('EDGE_RATE') or '+4%', os.environ.get('EDGE_PITCH') or '-6Hz'
 EDGE_VOLUME = os.environ.get('EDGE_VOLUME') or '-8%'
+# 대사(남:/여:/댓글:) 는 이야기꾼과 다른 '대화하는 사람' 목소리로, 조금 빠르고 생기 있게 (2026.11.21)
+SPEAKER = {'main': None,
+           '남': ('ko-KR-InJoonNeural', '+10%', '+0Hz', '+0%'),
+           '여': ('ko-KR-SunHiNeural', '+8%', '+0Hz', '+0%'),
+           '댓글': ('ko-KR-InJoonNeural', '+14%', '+5Hz', '-4%')}
+
+
+def voice_for(who, sents):
+    """(목소리, 속도, 높이, 크기) — 이야기꾼은 문단마다 아주 조금씩 속도·높이를 달리해 덜 기계적으로"""
+    if SPEAKER.get(who): return SPEAKER[who]
+    def pct(x): return int(str(x).replace('%', '').replace('+', '') or 0)
+    def hz(x): return int(str(x).replace('Hz', '').replace('+', '') or 0)
+    base_r, base_p = pct(EDGE_RATE) - 2, hz(EDGE_PITCH) + 2          # 기본을 살짝 느긋하고 덜 낮게 → 사람 말투에 가깝게
+    avg = sum(len(x) for x in sents) / max(1, len(sents))
+    r = base_r - 4 if avg < 14 else base_r + 3 if avg > 40 else base_r  # 짧고 긴장된 문단은 천천히, 긴 설명은 조금 빠르게
+    h = int(hashlib.md5(''.join(sents).encode()).hexdigest()[:2], 16) % 5 - 2   # 문단마다 -2~+2Hz
+    return EDGE_VOICE, f'{r:+d}%', f'{base_p + h:+d}Hz', EDGE_VOLUME
 
 
 def sentences(text):
@@ -49,17 +66,20 @@ def parse(src):  # web/app.js 의 parse 와 같은 규칙
 
 
 def paragraphs(src):
-    """빈 줄·[표시] 줄로 나뉜 문단 → [[문장, …], …] (한 문단은 한 번에 읽혀서 억양이 자연스럽게 이어짐)"""
+    """빈 줄·[표시] 줄로 나뉜 문단 → [(말한 사람, [문장, …]), …] — 대사 줄(남:/여:/댓글:)은 그 줄만 따로 그 사람 목소리로"""
     out, cur = [], []
     for raw in src.splitlines():
         L = raw.strip()
         if not L or L.startswith('#') or L.startswith('['):
-            if cur: out.append(cur); cur = []
+            if cur: out.append(('main', cur)); cur = []
             continue
-        L = re.sub(r'^(댓글|남|여)\s*:\s*', '', L)
+        m = re.match(r'^(댓글|남|여)\s*:\s*(.*)$', L)
+        if m:
+            if cur: out.append(('main', cur)); cur = []
+            out.append((m.group(1), sentences(m.group(2)))); continue
         cur += sentences(L)
-        if len(''.join(cur)) > 420: out.append(cur); cur = []
-    if cur: out.append(cur)
+        if len(''.join(cur)) > 420: out.append(('main', cur)); cur = []
+    if cur: out.append(('main', cur))
     return out
 
 
@@ -71,15 +91,16 @@ def synth_para(src, cache):
     import edge_tts
     cache.mkdir(parents=True, exist_ok=True); paras = paragraphs(src); table = {}
     norm = lambda x: re.sub(r'[^0-9A-Za-z\uac00-\ud7a3]', '', x)
-    async def one(sem, sents):
-        text = ' '.join(sents); key = hashlib.md5(f'para|{EDGE_VOICE}|{EDGE_RATE}|{EDGE_PITCH}|{EDGE_VOLUME}|{text}'.encode()).hexdigest()[:16]
+    async def one(sem, para):
+        who, sents = para; V, R, P, VOL = voice_for(who, sents)
+        text = ' '.join(sents); key = hashlib.md5(f'para2|{V}|{R}|{P}|{VOL}|{text}'.encode()).hexdigest()[:16]
         names = [f'{key}_{i}.wav' for i in range(len(sents))]
         if all((cache / n).exists() for n in names): return sents, names
         async with sem:
             for k in range(5):
                 try:
                     audio, words = b'', []
-                    async for ch in edge_tts.Communicate(text, EDGE_VOICE, rate=EDGE_RATE, pitch=EDGE_PITCH, volume=EDGE_VOLUME, boundary='WordBoundary').stream():
+                    async for ch in edge_tts.Communicate(text, V, rate=R, pitch=P, volume=VOL, boundary='WordBoundary').stream():
                         if ch['type'] == 'audio': audio += ch['data']
                         elif ch['type'] == 'WordBoundary': words.append((ch['offset'] / 1e7, (ch['offset'] + ch['duration']) / 1e7, norm(ch['text'])))
                     if audio and words: break
@@ -124,14 +145,15 @@ def synth_edge(items, cache):
     import edge_tts
     cache.mkdir(parents=True, exist_ok=True); table = {}; todo = []
     for who, s in items:
-        key = hashlib.md5(f'edge|{EDGE_VOICE}|{EDGE_RATE}|{EDGE_PITCH}|{s}'.encode()).hexdigest()[:16]; f = cache / f'{key}.mp3'
+        V, R, P, _ = voice_for(who, [s])
+        key = hashlib.md5(f'edge2|{V}|{R}|{P}|{s}'.encode()).hexdigest()[:16]; f = cache / f'{key}.mp3'
         table.setdefault(s, f.name)
-        if not f.exists() or f.stat().st_size < 500: todo.append((s, f))
-    async def one(sem, s, f):
+        if not f.exists() or f.stat().st_size < 500: todo.append((s, f, V, R, P))
+    async def one(sem, s, f, V, R, P):
         async with sem:
             for k in range(5):
                 try:
-                    await edge_tts.Communicate(s, EDGE_VOICE, rate=EDGE_RATE, pitch=EDGE_PITCH).save(str(f))
+                    await edge_tts.Communicate(s, V, rate=R, pitch=P).save(str(f))
                     if f.stat().st_size > 500: return
                 except Exception as e:
                     if k == 4: raise
@@ -139,7 +161,7 @@ def synth_edge(items, cache):
     async def run():
         sem = asyncio.Semaphore(4); done = 0
         for i in range(0, len(todo), 40):
-            await asyncio.gather(*(one(sem, s, f) for s, f in todo[i:i + 40])); done += len(todo[i:i + 40]); print(f'  음성 {done}/{len(todo)}', flush=True)
+            await asyncio.gather(*(one(sem, *x) for x in todo[i:i + 40])); done += len(todo[i:i + 40]); print(f'  음성 {done}/{len(todo)}', flush=True)
     asyncio.run(run()); return table
 
 
