@@ -1,0 +1,271 @@
+#!/usr/bin/env python3
+"""괴담 낭독 영상 자동 제작
+사용: python3 pipeline/make_video.py stories/01_제목.txt [--res 1080] [--channel 이름]
+1) 원고 문장마다 Supertonic-3 한국어 음성으로 읽기 — 진행·본문은 낮고 잔잔한 남자 목소리(M2)
+2) web/index.html(장면·자막·배경음·효과음 엔진)을 헤드리스 크롬으로 돌려 MP4 만들기
+3) 오디오를 AAC로 바꿔 아이폰·유튜브 호환 MP4로 저장 + 썸네일 + 유튜브 설명문
+"""
+import argparse, hashlib, json, os, re, subprocess, sys, time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+# 진행자·본문: M2 (가장 낮고 차분한 남자 목소리, 약 86Hz) / 댓글: M3 / 남자 대사: M1 / 여자 대사: F2
+VOICE = {'main': ('M2', .86), '댓글': ('M3', .95), '여': ('F2', .86), '남': ('M1', .9)}
+STEPS = 14
+# 기본 목소리: 마이크로소프트 신경망 음성 InJoon (무료 · 키 필요 없음, edge-tts). 실패하면 Supertonic 으로 자동 전환
+ENGINE = os.environ.get('VOICE_ENGINE', 'edge')
+# 목소리: 현수(이야기하듯 자연스러운 남자 음성) · 살짝 빠르게(+4%) · 낮게(-6Hz) · 작게 — 처지지 않고 빠져드는 서늘한 이야기꾼 톤 (2026.11.19 샘플 3번). EDGE_VOICE 로 바꿀 수 있음
+EDGE_VOICE, EDGE_RATE, EDGE_PITCH = os.environ.get('EDGE_VOICE') or 'ko-KR-HyunsuMultilingualNeural', os.environ.get('EDGE_RATE') or '+4%', os.environ.get('EDGE_PITCH') or '-6Hz'
+EDGE_VOLUME = os.environ.get('EDGE_VOLUME') or '-8%'
+# 대사(남:/여:/댓글:) 는 이야기꾼과 다른 '대화하는 사람' 목소리로, 조금 빠르고 생기 있게 (2026.11.21)
+SPEAKER = {'main': None,
+           '남': ('ko-KR-InJoonNeural', '+10%', '+0Hz', '+0%'),
+           '여': ('ko-KR-SunHiNeural', '+8%', '+0Hz', '+0%'),
+           '댓글': ('ko-KR-InJoonNeural', '+14%', '+5Hz', '-4%')}
+
+
+def voice_for(who, sents):
+    """(목소리, 속도, 높이, 크기) — 이야기꾼은 문단마다 아주 조금씩 속도·높이를 달리해 덜 기계적으로"""
+    if SPEAKER.get(who): return SPEAKER[who]
+    def pct(x): return int(str(x).replace('%', '').replace('+', '') or 0)
+    def hz(x): return int(str(x).replace('Hz', '').replace('+', '') or 0)
+    base_r, base_p = pct(EDGE_RATE) - 2, hz(EDGE_PITCH) + 2          # 기본을 살짝 느긋하고 덜 낮게 → 사람 말투에 가깝게
+    avg = sum(len(x) for x in sents) / max(1, len(sents))
+    r = base_r - 4 if avg < 14 else base_r + 3 if avg > 40 else base_r  # 짧고 긴장된 문단은 천천히, 긴 설명은 조금 빠르게
+    h = int(hashlib.md5(''.join(sents).encode()).hexdigest()[:2], 16) % 5 - 2   # 문단마다 -2~+2Hz
+    return EDGE_VOICE, f'{r:+d}%', f'{base_p + h:+d}Hz', EDGE_VOLUME
+
+
+def sentences(text):
+    parts = [p.strip() for p in re.findall(r'[^.?!…。]+[.?!…。]*["\'”’)]*\s*', text) if p.strip()] or [text]
+    out = []
+    for p in parts:
+        if out and len(p) < 6: out[-1] += ' ' + p
+        else: out.append(p)
+    fin = []
+    for s in out:
+        if len(s) <= 70: fin.append(s); continue
+        cur = ''
+        for seg in re.split(r'(?<=,)\s*', s):
+            if len(cur + seg) > 70 and cur: fin.append(cur.strip()); cur = ''
+            cur += seg + ' '
+        if cur.strip(): fin.append(cur.strip())
+    return fin
+
+
+def parse(src):  # web/app.js 의 parse 와 같은 규칙
+    items = []
+    for raw in src.splitlines():
+        L = raw.strip()
+        if not L or L.startswith('#') or re.match(r'^\[(장면|효과|쉼|챕터)\s*:', L): continue
+        who, text = 'main', L
+        m = re.match(r'^(댓글|남|여)\s*:\s*(.*)$', L)
+        if m: who, text = m.group(1), m.group(2)
+        for s in sentences(text): items.append((who, s))
+    return items
+
+
+def paragraphs(src):
+    """빈 줄·[표시] 줄로 나뉜 문단 → [(말한 사람, [문장, …]), …] — 대사 줄(남:/여:/댓글:)은 그 줄만 따로 그 사람 목소리로"""
+    out, cur = [], []
+    for raw in src.splitlines():
+        L = raw.strip()
+        if not L or L.startswith('#') or L.startswith('['):
+            if cur: out.append(('main', cur)); cur = []
+            continue
+        m = re.match(r'^(댓글|남|여)\s*:\s*(.*)$', L)
+        if m:
+            if cur: out.append(('main', cur)); cur = []
+            out.append((m.group(1), sentences(m.group(2)))); continue
+        cur += sentences(L)
+        if len(''.join(cur)) > 420: out.append(('main', cur)); cur = []
+    if cur: out.append(('main', cur))
+    return out
+
+
+def synth_para(src, cache):
+    """문단을 통째로 읽힌 뒤, 단어 위치(WordBoundary)로 문장마다 잘라 wav 로 저장 → {문장: 파일}"""
+    import asyncio, numpy as np, soundfile as sf
+    if os.path.exists('/root/.ccr/ca-bundle.crt'):
+        import certifi; certifi.where = lambda: '/root/.ccr/ca-bundle.crt'
+    import edge_tts
+    cache.mkdir(parents=True, exist_ok=True); paras = paragraphs(src); table = {}
+    norm = lambda x: re.sub(r'[^0-9A-Za-z\uac00-\ud7a3]', '', x)
+    async def one(sem, para):
+        who, sents = para; V, R, P, VOL = voice_for(who, sents)
+        text = ' '.join(sents); key = hashlib.md5(f'para2|{V}|{R}|{P}|{VOL}|{text}'.encode()).hexdigest()[:16]
+        names = [f'{key}_{i}.wav' for i in range(len(sents))]
+        if all((cache / n).exists() for n in names): return sents, names
+        async with sem:
+            for k in range(5):
+                try:
+                    audio, words = b'', []
+                    async for ch in edge_tts.Communicate(text, V, rate=R, pitch=P, volume=VOL, boundary='WordBoundary').stream():
+                        if ch['type'] == 'audio': audio += ch['data']
+                        elif ch['type'] == 'WordBoundary': words.append((ch['offset'] / 1e7, (ch['offset'] + ch['duration']) / 1e7, norm(ch['text'])))
+                    if audio and words: break
+                except Exception:
+                    if k == 4: raise
+                await asyncio.sleep(2 + k * 3)
+        mp = cache / f'{key}.mp3'; mp.write_bytes(audio)
+        r = subprocess.run(['ffmpeg', '-v', 'error', '-i', str(mp), '-f', 's16le', '-ac', '1', '-ar', '24000', '-'], capture_output=True, check=True)
+        pcm = np.frombuffer(r.stdout, dtype='<i2'); sr = 24000; mp.unlink()
+        # 문장 경계(글자 수 누적) ↔ 단어 경계 맞추기
+        cum, acc = [], 0
+        for _, _, w in words: acc += len(w); cum.append(acc)
+        cuts, tot = [0], 0
+        for i, s in enumerate(sents[:-1]):
+            tot += len(norm(s)); j = next((k for k, c in enumerate(cum) if c >= tot), None)
+            if j is None or j + 1 >= len(words): cuts = None; break
+            cuts.append(int((words[j][1] + words[j + 1][0]) / 2 * sr))
+        if cuts is None or acc != sum(len(norm(x)) for x in sents):   # 맞지 않으면 문장 비율로 자르기
+            lens = [max(1, len(norm(x))) for x in sents]; T = len(pcm); c = 0; cuts = [0]
+            for L_ in lens[:-1]: c += L_; cuts.append(int(T * c / sum(lens)))
+        cuts.append(len(pcm))
+        for i, n in enumerate(names):
+            seg = pcm[cuts[i]:cuts[i + 1]].astype('float32') / 32768
+            f = min(len(seg), 240); seg[:f] *= np.linspace(0, 1, f); seg[-f:] *= np.linspace(1, 0, f)
+            sf.write(cache / n, seg, sr, subtype='PCM_16')
+        return sents, names
+    async def run():
+        sem = asyncio.Semaphore(4); res = []
+        for i in range(0, len(paras), 20):
+            res += await asyncio.gather(*(one(sem, p) for p in paras[i:i + 20])); print(f'  음성(문단) {min(i + 20, len(paras))}/{len(paras)}', flush=True)
+        return res
+    for sents, names in asyncio.run(run()):
+        for s_, n in zip(sents, names): table.setdefault(s_, n)
+    return table
+
+
+def synth_edge(items, cache):
+    """한 사람 목소리(InJoon)로 문장마다 mp3 만들기 — 동시에 4개씩"""
+    import asyncio
+    if os.path.exists('/root/.ccr/ca-bundle.crt'):  # (테스트 환경용 인증서)
+        import certifi; certifi.where = lambda: '/root/.ccr/ca-bundle.crt'
+    import edge_tts
+    cache.mkdir(parents=True, exist_ok=True); table = {}; todo = []
+    for who, s in items:
+        V, R, P, _ = voice_for(who, [s])
+        key = hashlib.md5(f'edge2|{V}|{R}|{P}|{s}'.encode()).hexdigest()[:16]; f = cache / f'{key}.mp3'
+        table.setdefault(s, f.name)
+        if not f.exists() or f.stat().st_size < 500: todo.append((s, f, V, R, P))
+    async def one(sem, s, f, V, R, P):
+        async with sem:
+            for k in range(5):
+                try:
+                    await edge_tts.Communicate(s, V, rate=R, pitch=P).save(str(f))
+                    if f.stat().st_size > 500: return
+                except Exception as e:
+                    if k == 4: raise
+                await asyncio.sleep(2 + k * 3)
+    async def run():
+        sem = asyncio.Semaphore(4); done = 0
+        for i in range(0, len(todo), 40):
+            await asyncio.gather(*(one(sem, *x) for x in todo[i:i + 40])); done += len(todo[i:i + 40]); print(f'  음성 {done}/{len(todo)}', flush=True)
+    asyncio.run(run()); return table
+
+
+def synth(items, cache, src=None):
+    if ENGINE == 'edge' and src:
+        try:
+            t = synth_para(src, cache)
+            if all(s in t for _, s in items): return t
+            print('  ! 일부 문장이 빠져 문장별로 다시 만듭니다', flush=True)
+        except Exception as e: print('  ! 문단 음성 실패 → 문장별로 만듭니다:', e, flush=True)
+    if ENGINE == 'edge':
+        try: return synth_edge(items, cache)
+        except Exception as e: print('  ! InJoon 음성 실패 → Supertonic 으로 대신 만듭니다:', e, flush=True)
+    import numpy as np, soundfile as sf
+    from supertonic import TTS
+    tts = TTS(); styles = {}
+    cache.mkdir(parents=True, exist_ok=True); table = {}
+    for i, (who, s) in enumerate(items):
+        v, sp = VOICE.get(who, VOICE['main'])
+        # 짧은 문장·말줄임·마지막 반전 문장은 천천히, 긴 설명 문장은 살짝 빠르게 (사람이 읽는 리듬)
+        if len(s) < 12 or s.endswith(('...', '…')): sp *= .93
+        elif len(s) > 45: sp *= 1.03
+        sp = round(max(.7, min(1.2, sp)), 3)
+        key = hashlib.md5(f'{v}|{sp}|{STEPS}|{s}'.encode()).hexdigest()[:16]; f = cache / f'{key}.wav'
+        if not f.exists():
+            if v not in styles: styles[v] = tts.get_voice_style(v)
+            wav, _ = tts.synthesize(s, voice_style=styles[v], lang='ko', speed=sp, total_steps=STEPS)
+            w = np.asarray(wav, dtype='float32').squeeze()
+            # 앞뒤 무음 정리 + 끝 살짝 페이드
+            nz = np.where(np.abs(w) > .01)[0]
+            if len(nz): w = w[max(0, nz[0] - 600): nz[-1] + 2200]
+            fade = min(len(w), 1200); w[-fade:] *= np.linspace(1, 0, fade)
+            sf.write(f, w, 44100, subtype='PCM_16')
+        table.setdefault(s, f.name)
+        if i % 50 == 0: print(f'  음성 {i + 1}/{len(items)}', flush=True)
+    return table
+
+
+def render(story_path, table, cache, out_mp4, res, channel, vbr, main=True, short='auto', thumb=None, images=None, opts=None):
+    """main: 가로 영상 · short: 'auto'(3분 이하일 때)/True/False"""
+    from playwright.sync_api import sync_playwright
+    src = story_path.read_text(encoding='utf-8')
+    with sync_playwright() as pw:
+        b = pw.chromium.launch(args=['--autoplay-policy=no-user-gesture-required'])
+        ctx = b.new_context(viewport={'width': 1400, 'height': 900}, accept_downloads=True)
+        page = ctx.new_page(); errs = []
+        page.on('pageerror', lambda e: errs.append(str(e)))
+        def serve(r):
+            n = r.request.url.rsplit('/', 1)[1]
+            if n == '__bgm': return r.fulfill(path=str(ROOT / 'web' / 'bgm_mystery.mp3'), content_type='audio/mpeg')
+            if n.startswith('__img'): return r.fulfill(path=str(images[int(n[5:])]), content_type='image/jpeg')
+            r.fulfill(path=str(cache / n), content_type='audio/mpeg' if n.endswith('.mp3') else 'audio/wav')
+        page.route('http://aud.local/**', serve)
+        page.goto((ROOT / 'web' / 'index.html').as_uri()); page.wait_for_timeout(1500)
+        page.evaluate("""([src, table, res, channel, vbr, thumb, nimg]) => {
+          if (nimg) { S.imgUrls = Array.from({ length: nimg }, (_, i) => 'http://aud.local/__img' + i); S.imgPre = true; }
+          S.engine = 'ext'; S.res = res; S.channel = channel; S.vbr = vbr; S.bgm = .19; S.reverb = .03; S.bgmUrl = 'http://aud.local/__bgm'; S.noBreath = false; S.asmr = true; S.gapK = .3; S.pauseK = .7; S.thumb = thumb; S.scenes = '숲,복도,창문,골목,방,터널'; S.voiceCredit = 'AI 음성 — 이 영상의 목소리는 AI가 생성했습니다'; window.showSaveFilePicker = undefined;
+          TTS.get = async (text, voice) => { const f = table[text]; if (!f) throw new Error('음성 없음: ' + text);
+            const ab = await (await fetch('http://aud.local/' + f)).arrayBuffer(); return await ac().decodeAudioData(ab); };
+          document.querySelector('#script').value = src; }""", [src, table, res, channel, vbr, thumb, len(images or [])])
+        if opts: page.evaluate('o => Object.assign(S, o)', opts)          # 숏츠 라벨·처음/끝 문구 등
+        page.click('#bMake'); page.wait_for_selector('#after:not([hidden])', timeout=1800000)
+        total = page.evaluate('PROJ.total'); print(f'  길이 {total / 60:.1f}분', flush=True)
+        if main:
+            page.evaluate('S.fps = PROJ.total > 600 ? 24 : 30')   # 긴 영상은 24fps (화면이 천천히 움직여서 차이 없음, 인코딩 빨라짐)
+            t1 = time.time(); print('  가로 영상 인코딩 시작', flush=True)
+            with page.expect_download(timeout=14400000) as dl: page.click('#bMP4')
+            dl.value.save_as(str(out_mp4) + '.tmp.mp4'); print(f'  인코딩 {time.time() - t1:.0f}초', flush=True)
+        short_tmp = None
+        if (short is True or short == 'auto') and total <= 180:  # 유튜브 숏츠는 3분 이하
+            page.evaluate('S.fps = 30')
+            print('  숏츠(세로) 인코딩', flush=True)
+            with page.expect_download(timeout=7200000) as d3: page.click('#bShort')
+            short_tmp = str(out_mp4.with_name(out_mp4.stem + '_short.tmp.mp4')); d3.value.save_as(short_tmp)
+        if main:
+            with page.expect_download() as d2: page.click('#bThumb')
+            d2.value.save_as(str(out_mp4.with_name(out_mp4.stem + '_썸네일.png')))
+        yt = page.evaluate('ytText()'); srt = page.evaluate('srt()')
+        b.close()
+        if errs: print('  페이지 경고:', errs[:3])
+    if main:
+        out_mp4.with_name(out_mp4.stem + '_유튜브.txt').write_text(yt, encoding='utf-8')
+        out_mp4.with_name(out_mp4.stem + '.srt').write_text(srt, encoding='utf-8')
+    # 오디오 AAC 로 (아이폰 사진앱·유튜브 호환), 영상은 그대로
+    def aac(src, dst):  # 오디오 AAC 로 (아이폰 사진앱·유튜브 호환), 영상은 그대로
+        subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', src, '-c:v', 'copy', '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11', '-ar', '48000', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', dst], check=True)
+        os.remove(src)
+    if main: aac(str(out_mp4) + '.tmp.mp4', str(out_mp4))
+    if short_tmp: aac(short_tmp, str(out_mp4.with_name(out_mp4.stem + '_short.mp4')))
+    return total
+
+
+def main():
+    ap = argparse.ArgumentParser(); ap.add_argument('story'); ap.add_argument('--res', type=int, default=1080); ap.add_argument('--channel', default='')
+    ap.add_argument('--vbr', type=float, default=3.5e6); ap.add_argument('--out', default=str(ROOT / 'out'))
+    a = ap.parse_args(); sp = Path(a.story); src = sp.read_text(encoding='utf-8')
+    title = next((l.lstrip('# ').strip() for l in src.splitlines() if l.startswith('#')), sp.stem)
+    out = Path(a.out); out.mkdir(parents=True, exist_ok=True); cache = ROOT / '.tts_cache'
+    t0 = time.time(); items = parse(src); print(f'[{title}] 문장 {len(items)}개 — 음성 합성', flush=True)
+    table = synth(items, cache)
+    mp4 = out / (re.sub(r'[\\/:*?"<>|]', '_', title).replace(' ', '_') + '.mp4')
+    total = render(sp, table, cache, mp4, a.res, a.channel, a.vbr)
+    print(f'완료: {mp4} ({total / 60:.1f}분, {mp4.stat().st_size / 1e6:.0f}MB, {time.time() - t0:.0f}초 걸림)')
+
+
+if __name__ == '__main__':
+    main()

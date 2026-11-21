@@ -17,16 +17,22 @@ ENGINE = os.environ.get('VOICE_ENGINE', 'edge')
 # 목소리: 현수(이야기하듯 자연스러운 남자 음성) · 살짝 빠르게(+4%) · 낮게(-6Hz) · 작게 — 처지지 않고 빠져드는 서늘한 이야기꾼 톤 (2026.11.19 샘플 3번). EDGE_VOICE 로 바꿀 수 있음
 EDGE_VOICE, EDGE_RATE, EDGE_PITCH = os.environ.get('EDGE_VOICE') or 'ko-KR-HyunsuMultilingualNeural', os.environ.get('EDGE_RATE') or '+4%', os.environ.get('EDGE_PITCH') or '-6Hz'
 EDGE_VOLUME = os.environ.get('EDGE_VOLUME') or '-8%'
-# 대사(남:/여:/댓글:) 는 이야기꾼과 다른 '대화하는 사람' 목소리로, 조금 빠르고 생기 있게 (2026.11.21)
+# 대사(남:/여:/댓글:) — 재연 목소리는 빠르고 생기 있게 (2026.11.21 밤 개선)
+#   남: 인준은 같은 문장이 9.6초로 느리고 기계적 → 가장 자연스러운 현수 음성을 이야기꾼보다 높고 빠르게
+#   여: 선희를 훨씬 빠르게 + 살짝 높게 / 댓글(게시판 글): 선희를 낮게, 담담하게
 SPEAKER = {'main': None,
-           '남': ('ko-KR-InJoonNeural', '+10%', '+0Hz', '+0%'),
-           '여': ('ko-KR-SunHiNeural', '+8%', '+0Hz', '+0%'),
-           '댓글': ('ko-KR-InJoonNeural', '+14%', '+5Hz', '-4%')}
+           '남': ('ko-KR-HyunsuMultilingualNeural', '+16%', '+4Hz', '+0%'),
+           '여': ('ko-KR-SunHiNeural', '+20%', '+3Hz', '+0%'),
+           '댓글': ('ko-KR-SunHiNeural', '+16%', '-3Hz', '-4%')}
 
 
 def voice_for(who, sents):
     """(목소리, 속도, 높이, 크기) — 이야기꾼은 문단마다 아주 조금씩 속도·높이를 달리해 덜 기계적으로"""
-    if SPEAKER.get(who): return SPEAKER[who]
+    if SPEAKER.get(who):                                                  # 대사도 줄마다 속도·높이를 조금씩 달리해 덜 기계적으로
+        V, R, P, VOL = SPEAKER[who]; j = int(hashlib.md5(''.join(sents).encode()).hexdigest()[:2], 16)
+        r = int(R.replace('%', '')) + (j % 7 - 3) + (4 if any(x.endswith(('!', '?')) for x in sents) else 0)
+        p = int(P.replace('Hz', '')) + (j // 7 % 5 - 2)
+        return V, f'{r:+d}%', f'{p:+d}Hz', VOL
     def pct(x): return int(str(x).replace('%', '').replace('+', '') or 0)
     def hz(x): return int(str(x).replace('Hz', '').replace('+', '') or 0)
     base_r, base_p = pct(EDGE_RATE) - 2, hz(EDGE_PITCH) + 2          # 기본을 살짝 느긋하고 덜 낮게 → 사람 말투에 가깝게
