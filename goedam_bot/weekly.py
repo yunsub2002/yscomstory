@@ -106,7 +106,7 @@ document.querySelectorAll('.tabs a').forEach(a=>a.onclick=e=>{e.preventDefault()
 def render_page(gd, db):
     items = []
     for k, v in enumerate(db):
-        m, s = divmod(int(v['sec']), 60); kind = '숏츠' if v.get('kind') == 'short' else '30분 이야기'
+        m, s = divmod(int(v['sec']), 60); kind = {'short': '숏츠', 'mix': '몰아듣기'}.get(v.get('kind'), '30분 이야기')
         yt = ''.join(f'<a href="https://studio.youtube.com/video/{html.escape(i)}/edit">▶ 유튜브{lab} 공개 설정</a>' for i, lab in ((v.get('yt_id'), ''), (v.get('short_yt_id'), ' 숏츠')) if i)
         dl = ((f'<a class="t" href="{html.escape(v["url"])}">⬇ 영상</a>' if v.get('url') else '')
               + (f'<a class="t" href="{html.escape(v["short_url"])}">⬇ 숏츠</a>' if v.get('short_url') else '')
@@ -252,6 +252,8 @@ def main():
 if __name__ == '__main__':
     if MODE == 'backfill':                                          # 지금까지 만든 영상 전부 → 숏츠
         import backfill_shorts; backfill_shorts.run(); sys.exit(0)
+    if MODE == 'mix':                                               # 지난 이야기 몰아듣기 (1시간 반~2시간)
+        import mix; mix.main(); sys.exit(0)
     n = max(1, min(4, int(os.environ.get('COUNT') or 1)))   # 한 번 실행에 몇 편 (최대 4)
     for k in range(n):
         print(f'\n########## {k + 1}/{n}편 ##########', flush=True)
