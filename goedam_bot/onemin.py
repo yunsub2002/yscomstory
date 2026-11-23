@@ -40,7 +40,7 @@ def run():
             tab = mv.synth(mv.parse(txt), BOT / '.tts_cache', src=txt)
             label = meta.get('thumb', {}).get('label') or '1분 괴담'
             sec = mv.render(sp, tab, BOT / '.tts_cache', out / f'{name}.mp4', 1080, W.CHANNEL, 3.5e6, main=False, short=True, images=imgs or None,
-                            opts={'shortLabel': label, 'shortHook': '결말까지 1분, 끝까지 들어 보세요', 'shortOutro': ['구독하고', '매일 밤 1분 괴담']})
+                            opts={'shortLabel': label, 'shortHook': meta.get('hook') or '결말까지 1분, 끝까지 들어 보세요', 'shortOutro': meta.get('outro') or ['구독하고', '매일 밤 1분 괴담']})
             f = out / f'{name}_short.mp4'
             if not f.exists(): print('  ! 숏츠가 만들어지지 않았습니다', flush=True); continue
             print(f'  길이 {sec:.0f}초' + ('  ⚠ 60초를 넘었습니다' if sec > 60 else ''), flush=True)
