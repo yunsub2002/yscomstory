@@ -6,10 +6,10 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: '무엇을 만들까요 (episode = 30분 이야기 + 도입부 숏츠 · mix = 지난 이야기 몰아듣기 · backfill = 지금까지 만든 영상 전부 숏츠로)'
+        description: '무엇을 만들까요 (episode = 30분 이야기 + 도입부 숏츠 · onemin = 1분 완결 숏츠 · mix = 지난 이야기 몰아듣기 · backfill = 지금까지 만든 영상 전부 숏츠로)'
         type: choice
         default: episode
-        options: [episode, mix, short, backfill]
+        options: [episode, onemin, mix, short, backfill]
       count:
         description: '이번에 만들 편수 (1~4, 한 편에 약 40~50분)'
         default: '1'

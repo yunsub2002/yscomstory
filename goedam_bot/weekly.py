@@ -252,6 +252,8 @@ def main():
 if __name__ == '__main__':
     if MODE == 'backfill':                                          # 지금까지 만든 영상 전부 → 숏츠
         import backfill_shorts; backfill_shorts.run(); sys.exit(0)
+    if MODE == 'onemin':                                            # 1분 완결 숏츠만 (본편 없이)
+        import onemin; onemin.run(); sys.exit(0)
     if MODE == 'mix':                                               # 지난 이야기 몰아듣기 (1시간 반~2시간)
         import mix; mix.main(); sys.exit(0)
     n = max(1, min(4, int(os.environ.get('COUNT') or 1)))   # 한 번 실행에 몇 편 (최대 4)
