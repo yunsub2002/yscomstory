@@ -106,6 +106,7 @@ document.querySelectorAll('.tabs a').forEach(a=>a.onclick=e=>{e.preventDefault()
 def render_page(gd, db):
     items = []
     for k, v in enumerate(db):
+        if v.get('kind') == 'short': continue  # 1분 숏츠는 숏츠 탭에만
         m, s = divmod(int(v['sec']), 60); kind = {'short': '숏츠', 'mix': '몰아듣기'}.get(v.get('kind'), '30분 이야기')
         yt = ''.join(f'<a href="https://studio.youtube.com/video/{html.escape(i)}/edit">▶ 유튜브{lab} 공개 설정</a>' for i, lab in ((v.get('yt_id'), ''), (v.get('short_yt_id'), ' 숏츠')) if i)
         dl = ((f'<a class="t" href="{html.escape(v["url"])}">⬇ 영상</a>' if v.get('url') else '')
