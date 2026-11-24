@@ -96,7 +96,7 @@ def main():
         subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-ss', '20', '-i', str(files[0][1]), '-frames:v', '1', str(th_src)], check=True)
     thumb = out / f'{name}_thumb.png'; font = (next((p for p in ['/usr/share/fonts/opentype/noto/NotoSansCJK-Black.ttc'] if os.path.exists(p)), None) or HS.FONT or '').replace(':', r'\:')
     big = f'잠들기 전 {hlabel}'; sub = '괴담 몰아듣기'; small = ' · '.join(names[:3]) + ' 외'; top = '불 끄고 · 이어폰 필수'
-    if RADIO: big = f'괴담 라디오 #{RADIO["no"]}'; sub = f'잠들기 전 {hlabel}'; small = ' · '.join(names[:4])
+    if RADIO: big = f'잘 때 듣는 라디오 #{RADIO["no"]}'; sub = f'불 끄고 {hlabel}'; small = ' · '.join(names[:4])
     tf = {}
     for k, txt in (('big', big), ('sub', sub), ('small', small), ('top', top)):
         tf[k] = out / f'th_{k}.txt'; tf[k].write_text(txt, encoding='utf-8')
@@ -114,13 +114,13 @@ def main():
             f'잠들기 전 듣는 괴담 {hlabel} 몰아듣기 | {", ".join(names)} [불 끄고 · 이어폰 필수]'
     if len(title) > 100: title = f'잠들기 전 듣는 괴담 {hlabel} 몰아듣기 | {", ".join(names[:2])} 외 [이어폰 필수]'
     if RADIO:
-        title = RADIO.get('title') or f'잠들기 전 {hlabel} | 귀담 괴담 라디오 #{RADIO["no"]} — {", ".join(names[:3])} 외 [이어폰 필수]'
+        title = RADIO.get('title') or f'잘 때 듣는 라디오 #{RADIO["no"]} | 잠들기 전 {hlabel} 괴담 — {", ".join(names[:3])} 외 [이어폰 필수]'
         title = title[:100]
     chap, t = [], 0
     for (v, _, d), n in zip(files, names):
         chap.append(f'{hms(t)} {n} — {v["title"].split(" | ")[0][:60]}'); t += d
     notes = sorted({l for v, _, _ in files for l in str(v.get('yt', '')).splitlines() if l.startswith('※')})
-    head = (f'귀담 괴담 라디오 #{RADIO["no"]}. 지난 화제작 한 편과 신작 {len(files) - 1}편을 {hlabel} 동안 이어서 들려 드립니다.\n' if RADIO else
+    head = (f'귀담 잘 때 듣는 라디오 #{RADIO["no"]}. 지난 화제작 한 편과 신작 {len(files) - 1}편을 {hlabel} 동안 이어서 들려 드립니다.\n' if RADIO else
             f'불 끄고 누워서, 끝까지 들어 보세요. 귀담의 이야기 {len(files)}편을 {hlabel} 동안 이어서 들려 드립니다.\n')
     desc = (head +
             f'중간에 잠들어도 괜찮아요. 내일 밤, 멈춘 곳부터 다시 들으면 됩니다.\n\n'
