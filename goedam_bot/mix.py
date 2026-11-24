@@ -50,7 +50,16 @@ def main():
     eps.reverse()                                                    # 오래된 것부터
     fresh = [v for v in eps if v['script'] not in used]; old = [v for v in eps if v['script'] in used]
     pick, tot = [], 0
-    for v in fresh + old:
+    # 괴담 라디오: radio.json 에 적은 원고를 그 순서대로 (이미 만든 회차면 건너뜀)
+    RADIO = None; rp = BOT / 'radio.json'
+    if rp.exists():
+        R_ = json.loads(rp.read_text(encoding='utf-8'))
+        if not any(c.get('radio') == R_['no'] for c in comp):
+            RADIO = R_; byname = {v['script']: v for v in eps}
+            miss = [s_ for s_ in R_['pick'] if s_ not in byname]
+            if miss: print('라디오에 넣을 본편이 아직 없습니다:', miss, flush=True); return
+            pick = [byname[s_] for s_ in R_['pick']]
+    for v in ([] if RADIO else fresh + old):
         if tot >= TARGET - 8 * 60: break
         if any(p['script'] == v['script'] for p in pick): continue
         pick.append(v); tot += v.get('sec', 1500)
@@ -87,6 +96,7 @@ def main():
         subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-ss', '20', '-i', str(files[0][1]), '-frames:v', '1', str(th_src)], check=True)
     thumb = out / f'{name}_thumb.png'; font = (next((p for p in ['/usr/share/fonts/opentype/noto/NotoSansCJK-Black.ttc'] if os.path.exists(p)), None) or HS.FONT or '').replace(':', r'\:')
     big = f'잠들기 전 {hlabel}'; sub = '괴담 몰아듣기'; small = ' · '.join(names[:3]) + ' 외'; top = '불 끄고 · 이어폰 필수'
+    if RADIO: big = f'괴담 라디오 #{RADIO["no"]}'; sub = f'잠들기 전 {hlabel}'; small = ' · '.join(names[:4])
     tf = {}
     for k, txt in (('big', big), ('sub', sub), ('small', small), ('top', top)):
         tf[k] = out / f'th_{k}.txt'; tf[k].write_text(txt, encoding='utf-8')
@@ -103,11 +113,16 @@ def main():
     title = f'잠들기 전 듣는 괴담 {hlabel} 몰아듣기 | {", ".join(names[:3])} 외 {len(names) - 3}편 [불 끄고 · 이어폰 필수]' if len(names) > 3 else \
             f'잠들기 전 듣는 괴담 {hlabel} 몰아듣기 | {", ".join(names)} [불 끄고 · 이어폰 필수]'
     if len(title) > 100: title = f'잠들기 전 듣는 괴담 {hlabel} 몰아듣기 | {", ".join(names[:2])} 외 [이어폰 필수]'
+    if RADIO:
+        title = RADIO.get('title') or f'잠들기 전 {hlabel} | 귀담 괴담 라디오 #{RADIO["no"]} — {", ".join(names[:3])} 외 [이어폰 필수]'
+        title = title[:100]
     chap, t = [], 0
     for (v, _, d), n in zip(files, names):
         chap.append(f'{hms(t)} {n} — {v["title"].split(" | ")[0][:60]}'); t += d
     notes = sorted({l for v, _, _ in files for l in str(v.get('yt', '')).splitlines() if l.startswith('※')})
-    desc = (f'불 끄고 누워서, 끝까지 들어 보세요. 귀담의 이야기 {len(files)}편을 {hlabel} 동안 이어서 들려 드립니다.\n'
+    head = (f'귀담 괴담 라디오 #{RADIO["no"]}. 지난 화제작 한 편과 신작 {len(files) - 1}편을 {hlabel} 동안 이어서 들려 드립니다.\n' if RADIO else
+            f'불 끄고 누워서, 끝까지 들어 보세요. 귀담의 이야기 {len(files)}편을 {hlabel} 동안 이어서 들려 드립니다.\n')
+    desc = (head +
             f'중간에 잠들어도 괜찮아요. 내일 밤, 멈춘 곳부터 다시 들으면 됩니다.\n\n'
             + W.GD_SUB_DESC + '\n📖 목차\n' + '\n'.join(chap) + '\n\n'
             + ('\n'.join(notes) + '\n' if notes else '※ 낭독: AI 음성 · 배경음·화면: 자체 제작\n')
@@ -126,7 +141,7 @@ def main():
     db.insert(0, {'date': f'{stamp:%Y-%m-%d}', 'kind': 'mix', 'title': title, 'sec': round(total), 'yt': yt, 'places': [], 'url': base + mp4.name,
                   'thumb_url': base + thumb.name, 'short_url': '', 'yt_id': vid, 'thumb': jpg.name})
     (gd / 'videos.json').write_text(json.dumps(db, ensure_ascii=False, indent=1), encoding='utf-8'); W.render_page(gd, db)
-    comp.insert(0, {'date': f'{stamp:%Y-%m-%d}', 'title': title, 'sec': round(total), 'yt_id': vid, 'scripts': [v['script'] for v, _, _ in files]})
+    comp.insert(0, {'date': f'{stamp:%Y-%m-%d}', 'title': title, 'sec': round(total), 'yt_id': vid, 'scripts': [v['script'] for v, _, _ in files], 'radio': RADIO['no'] if RADIO else None})
     cf.write_text(json.dumps(comp, ensure_ascii=False, indent=1), encoding='utf-8')
     W.sh('git', 'add', gd, cwd=root); W.sh('git', 'commit', '-m', f'괴담 몰아듣기 ({stamp:%Y-%m-%d})', cwd=root); W.push_safe(root, br)
     print(f'\n완료 → https://youtu.be/{vid}' if vid else '\n완료 (유튜브 업로드 꺼짐)', flush=True)
