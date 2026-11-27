@@ -30,6 +30,14 @@ def grade(im, sat=.55):
 
 def make(prompts, out_dir, seed=7, w=768, h=448, log=print, look=''):
     style, sat = (VIVID, .85) if look == 'vivid' else (STYLE, .55)
+    if look == 'occult':   # 장면마다 질감을 바꿔 다채롭고 기괴하게 (옛 사진·VHS·CCTV·꿈·촛불·달빛)
+        sat = .6
+        OCC = [', grainy 1990s VHS found footage still, chromatic aberration, dark horror, eerie, no text',
+               ', faded sepia 1910s photograph, scratches, dust, vignette, uncanny, horror, no text',
+               ', cinematic film still, candlelight, deep red and black, occult ritual atmosphere, unsettling, no text',
+               ', cold blue moonlight, heavy shadows, surreal nightmare, distorted perspective, horror, no text',
+               ', japanese horror film still, desaturated green tint, damp, eerie silence, film grain, no text',
+               ', extreme close-up, shallow depth of field, dark, creepy texture, highly detailed, no text']
     out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
     import torch
     from diffusers import AutoPipelineForText2Image
@@ -43,7 +51,7 @@ def make(prompts, out_dir, seed=7, w=768, h=448, log=print, look=''):
         f = out_dir / f'scene_{i:02d}_{hashlib.md5((p + str(seed) + look).encode()).hexdigest()[:8]}.jpg'
         if not f.exists():
             g = torch.Generator().manual_seed(seed * 100 + i)
-            im = pipe(prompt=p + style, negative_prompt=NEG, num_inference_steps=2, guidance_scale=0.0, width=w, height=h, generator=g).images[0]
+            im = pipe(prompt=p + (OCC[i % len(OCC)] if look == 'occult' else style), negative_prompt=NEG, num_inference_steps=2, guidance_scale=0.0, width=w, height=h, generator=g).images[0]
             grade(im, sat).save(f, quality=90)
         paths.append(f)
         if i % 5 == 0: log(f'  그림 {i + 1}/{len(prompts)} ({time.time() - t0:.0f}초)')

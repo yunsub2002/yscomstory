@@ -738,7 +738,7 @@ function sfx(ctx, out, id, t) {
       const a = ctx.createGain(); a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(.35, t + 1.2); a.gain.linearRampToValueAtTime(0, t + 3.4); s.connect(fl).connect(a).connect(out); s.start(t); s.stop(t + 3.5); break; }
     case '종': break;   // 종소리 사용 안 함 (요청으로 뺌)
     case '전화': for (let r = 0; r < 2; r++) { const a = t + r * 1.6; for (const f of [440, 480]) { const o = ctx.createOscillator(); o.frequency.value = f; const g = ctx.createGain(); g.gain.setValueAtTime(0, a); g.gain.linearRampToValueAtTime(.08, a + .02); g.gain.setValueAtTime(.08, a + .9); g.gain.linearRampToValueAtTime(0, a + .95); o.connect(g).connect(out); o.start(a); o.stop(a + 1); } } break;
-    case '정적': burst(t, 3000, .3, 1.1, .3, 'highpass'); break;
+    case '정적': break;   // '치익' 하는 정적 소리 사용 안 함 (2026.11.27 요청으로 뺌)
     case '문': { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(70, t); o.frequency.linearRampToValueAtTime(140, t + .6); o.frequency.linearRampToValueAtTime(90, t + 1.3); const fl = ctx.createBiquadFilter(); fl.type = 'bandpass'; fl.frequency.value = 1100; fl.Q.value = 6;
       const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 18; lg.gain.value = 600; lfo.connect(lg).connect(fl.frequency); const a = ctx.createGain(); a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(.2, t + .1); a.gain.linearRampToValueAtTime(0, t + 1.35); o.connect(fl).connect(a).connect(out); o.start(t); o.stop(t + 1.4); lfo.start(t); lfo.stop(t + 1.4); break; }
     case '차임': break;   // 차임(종 비슷한 소리)도 사용 안 함

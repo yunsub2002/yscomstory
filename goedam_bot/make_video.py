@@ -217,14 +217,14 @@ def render(story_path, table, cache, out_mp4, res, channel, vbr, main=True, shor
         page.on('pageerror', lambda e: errs.append(str(e)))
         def serve(r):
             n = r.request.url.rsplit('/', 1)[1]
-            if n == '__bgm': return r.fulfill(path=str(ROOT / 'web' / 'bgm_mystery.mp3'), content_type='audio/mpeg')
+            if n == '__bgm': return r.fulfill(path=str(ROOT / 'web' / 'bgm_horror.mp3'), content_type='audio/mpeg')
             if n.startswith('__img'): return r.fulfill(path=str(images[int(n[5:])]), content_type='image/jpeg')
             r.fulfill(path=str(cache / n), content_type='audio/mpeg' if n.endswith('.mp3') else 'audio/wav')
         page.route('http://aud.local/**', serve)
         page.goto((ROOT / 'web' / 'index.html').as_uri()); page.wait_for_timeout(1500)
         page.evaluate("""([src, table, res, channel, vbr, thumb, nimg]) => {
           if (nimg) { S.imgUrls = Array.from({ length: nimg }, (_, i) => 'http://aud.local/__img' + i); S.imgPre = true; }
-          S.engine = 'ext'; S.res = res; S.channel = channel; S.vbr = vbr; S.bgm = .19; S.reverb = .03; S.bgmUrl = 'http://aud.local/__bgm'; S.noBreath = false; S.asmr = true; S.gapK = .3; S.pauseK = .7; S.thumb = thumb; S.scenes = '숲,복도,창문,골목,방,터널'; S.voiceCredit = 'AI 음성 — 이 영상의 목소리는 AI가 생성했습니다'; window.showSaveFilePicker = undefined;
+          S.engine = 'ext'; S.res = res; S.channel = channel; S.vbr = vbr; S.bgm = .19; S.reverb = .03; S.bgmUrl = 'http://aud.local/__bgm'; S.noBreath = true; S.asmr = true; S.gapK = .3; S.pauseK = .7; S.thumb = thumb; S.scenes = '숲,복도,창문,골목,방,터널'; S.voiceCredit = 'AI 음성 — 이 영상의 목소리는 AI가 생성했습니다'; window.showSaveFilePicker = undefined;
           TTS.get = async (text, voice) => { const f = table[text]; if (!f) throw new Error('음성 없음: ' + text);
             const ab = await (await fetch('http://aud.local/' + f)).arrayBuffer(); return await ac().decodeAudioData(ab); };
           document.querySelector('#script').value = src; }""", [src, table, res, channel, vbr, thumb, len(images or [])])
