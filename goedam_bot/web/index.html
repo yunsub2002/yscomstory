@@ -734,8 +734,7 @@ function sfx(ctx, out, id, t) {
     case '노크': for (let i = 0; i < 3; i++) { const a = t + i * .3; burst(a, 900, 1.2, .12, .5); tone(a, 140, 80, .14, .6); } break;
     case '발소리': for (let i = 0; i < 4; i++) { const a = t + i * .52; burst(a, 300, .8, .16, .35, 'lowpass'); burst(a + .03, 2500, 1.5, .05, .05); } break;
     case '심장': for (let i = 0; i < 3; i++) { const a = t + i * .9; tone(a, 70, 40, .16, .9); tone(a + .2, 62, 36, .18, .7); } break;
-    case '바람': { const s = ctx.createBufferSource(); s.buffer = N; s.loop = true; const fl = ctx.createBiquadFilter(); fl.type = 'bandpass'; fl.Q.value = 2; fl.frequency.setValueAtTime(300, t); fl.frequency.linearRampToValueAtTime(900, t + 1.5); fl.frequency.linearRampToValueAtTime(350, t + 3.2);
-      const a = ctx.createGain(); a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(.35, t + 1.2); a.gain.linearRampToValueAtTime(0, t + 3.4); s.connect(fl).connect(a).connect(out); s.start(t); s.stop(t + 3.5); break; }
+    case '바람': break;   // 바람(치이익 하는 증기 같은 노이즈) 사용 안 함 (2026.11.27 요청으로 뺌)
     case '종': break;   // 종소리 사용 안 함 (요청으로 뺌)
     case '전화': for (let r = 0; r < 2; r++) { const a = t + r * 1.6; for (const f of [440, 480]) { const o = ctx.createOscillator(); o.frequency.value = f; const g = ctx.createGain(); g.gain.setValueAtTime(0, a); g.gain.linearRampToValueAtTime(.08, a + .02); g.gain.setValueAtTime(.08, a + .9); g.gain.linearRampToValueAtTime(0, a + .95); o.connect(g).connect(out); o.start(a); o.stop(a + 1); } } break;
     case '정적': break;   // '치익' 하는 정적 소리 사용 안 함 (2026.11.27 요청으로 뺌)

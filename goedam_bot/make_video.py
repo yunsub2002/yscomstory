@@ -28,6 +28,7 @@ SPEAKER = {'main': None,
 
 def voice_for(who, sents):
     """(목소리, 속도, 높이, 크기) — 이야기꾼은 문단마다 아주 조금씩 속도·높이를 달리해 덜 기계적으로"""
+    if os.environ.get('SINGLE_VOICE', '1') == '1': who = 'main'   # 2026.11.27: 귀담은 성우(이야기꾼) 한 목소리로만 — 재연·댓글도 이야기꾼이 읽음
     if SPEAKER.get(who):                                                  # 대사도 줄마다 속도·높이를 조금씩 달리해 덜 기계적으로
         V, R, P, VOL = SPEAKER[who]; j = int(hashlib.md5(''.join(sents).encode()).hexdigest()[:2], 16)
         r = int(R.replace('%', '')) + (j % 7 - 3) + (4 if any(x.endswith(('!', '?')) for x in sents) else 0)
@@ -186,7 +187,7 @@ def synth(items, cache, src=None):
     tts = TTS(); styles = {}
     cache.mkdir(parents=True, exist_ok=True); table = {}
     for i, (who, s) in enumerate(items):
-        v, sp = VOICE.get(who, VOICE['main'])
+        v, sp = VOICE['main'] if os.environ.get('SINGLE_VOICE', '1') == '1' else VOICE.get(who, VOICE['main'])
         # 짧은 문장·말줄임·마지막 반전 문장은 천천히, 긴 설명 문장은 살짝 빠르게 (사람이 읽는 리듬)
         if len(s) < 12 or s.endswith(('...', '…')): sp *= .93
         elif len(s) > 45: sp *= 1.03
